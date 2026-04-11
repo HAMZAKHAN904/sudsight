@@ -8,6 +8,7 @@ import {
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
+import { StatusBar } from "expo-status-bar";
 import React, { useEffect, useState } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
@@ -22,18 +23,21 @@ const queryClient = new QueryClient();
 
 function RootLayoutNav() {
   return (
-    <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      <Stack.Screen
-        name="subscription/add"
-        options={{ headerShown: false, presentation: "modal" }}
-      />
-      <Stack.Screen
-        name="subscription/[id]"
-        options={{ headerShown: false, presentation: "modal" }}
-      />
-      <Stack.Screen name="+not-found" />
-    </Stack>
+    <>
+      <StatusBar style="light" />
+      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: "#0B0B14" } }}>
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen
+          name="subscription/add"
+          options={{ headerShown: false, presentation: "modal" }}
+        />
+        <Stack.Screen
+          name="subscription/[id]"
+          options={{ headerShown: false, presentation: "modal" }}
+        />
+        <Stack.Screen name="+not-found" />
+      </Stack>
+    </>
   );
 }
 

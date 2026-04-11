@@ -3,18 +3,18 @@ import { View, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
 export const CATEGORIES = [
-  { id: "streaming", label: "Streaming", icon: "film", color: "#E11D48" },
-  { id: "music", label: "Music", icon: "musical-notes", color: "#7C3AED" },
-  { id: "fitness", label: "Fitness", icon: "fitness", color: "#059669" },
-  { id: "cloud", label: "Cloud", icon: "cloud", color: "#0284C7" },
-  { id: "gaming", label: "Gaming", icon: "game-controller", color: "#D97706" },
-  { id: "productivity", label: "Work", icon: "briefcase", color: "#6366F1" },
-  { id: "news", label: "News", icon: "newspaper", color: "#DC2626" },
-  { id: "food", label: "Food", icon: "restaurant", color: "#EA580C" },
-  { id: "education", label: "Education", icon: "school", color: "#0891B2" },
-  { id: "social", label: "Social", icon: "people", color: "#9333EA" },
-  { id: "finance", label: "Finance", icon: "card", color: "#16A34A" },
-  { id: "other", label: "Other", icon: "grid", color: "#6B7280" },
+  { id: "entertainment", label: "Entertainment", icon: "film", color: "#F04848" },
+  { id: "music",         label: "Music",          icon: "musical-notes", color: "#A855F7" },
+  { id: "productivity",  label: "Productivity",   icon: "briefcase", color: "#4B9EFF" },
+  { id: "education",     label: "Education",      icon: "school", color: "#8B5CF6" },
+  { id: "fitness",       label: "Fitness",        icon: "fitness", color: "#2EC4A7" },
+  { id: "cloud",         label: "Cloud",          icon: "cloud", color: "#0EA5E9" },
+  { id: "gaming",        label: "Gaming",         icon: "game-controller", color: "#F59E0B" },
+  { id: "business",      label: "Business",       icon: "stats-chart", color: "#10B981" },
+  { id: "news",          label: "News",           icon: "newspaper", color: "#EF4444" },
+  { id: "food",          label: "Food",           icon: "restaurant", color: "#F97316" },
+  { id: "finance",       label: "Finance",        icon: "card", color: "#22C55E" },
+  { id: "other",         label: "Other",          icon: "grid", color: "#6B7280" },
 ] as const;
 
 export type CategoryId = (typeof CATEGORIES)[number]["id"];
@@ -29,13 +29,9 @@ interface CategoryIconProps {
   showBackground?: boolean;
 }
 
-export function CategoryIcon({
-  categoryId,
-  size = 20,
-  showBackground = true,
-}: CategoryIconProps) {
+export function CategoryIcon({ categoryId, size = 20, showBackground = true }: CategoryIconProps) {
   const cat = getCategoryInfo(categoryId);
-  const iconSize = size * 0.6;
+  const iconSize = size * 0.55;
 
   if (!showBackground) {
     return <Ionicons name={cat.icon as never} size={size} color={cat.color} />;
@@ -48,8 +44,8 @@ export function CategoryIcon({
         {
           width: size,
           height: size,
-          borderRadius: size * 0.28,
-          backgroundColor: cat.color + "22",
+          borderRadius: size * 0.26,
+          backgroundColor: cat.color + "28",
         },
       ]}
     >

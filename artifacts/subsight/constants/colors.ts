@@ -1,69 +1,51 @@
 const colors = {
   light: {
     text: "#0f0f14",
-    tint: "#6366F1",
-
-    background: "#f8f8fc",
+    tint: "#4B9EFF",
+    background: "#F2F2F7",
     foreground: "#0f0f14",
-
-    card: "#ffffff",
+    card: "#FFFFFF",
     cardForeground: "#0f0f14",
-
-    primary: "#6366F1",
-    primaryForeground: "#ffffff",
-
-    secondary: "#f0f0f8",
+    primary: "#4B9EFF",
+    primaryForeground: "#FFFFFF",
+    secondary: "#E8E8F0",
     secondaryForeground: "#1a1a2e",
-
-    muted: "#f0f0f8",
-    mutedForeground: "#8585a0",
-
-    accent: "#818CF8",
-    accentForeground: "#ffffff",
-
-    destructive: "#F43F5E",
-    destructiveForeground: "#ffffff",
-
-    border: "#e8e8f0",
-    input: "#e8e8f0",
-
-    success: "#10B981",
-    warning: "#F59E0B",
+    muted: "#E8E8F0",
+    mutedForeground: "#8A8A9A",
+    accent: "#2EC4A7",
+    accentForeground: "#FFFFFF",
+    destructive: "#F04848",
+    destructiveForeground: "#FFFFFF",
+    border: "#DCDCE8",
+    input: "#DCDCE8",
+    success: "#2EC4A7",
+    warning: "#F5A623",
+    spendingCard: "#1A2D58",
   },
-
   dark: {
-    text: "#f0f0f8",
-    tint: "#818CF8",
-
-    background: "#06060F",
-    foreground: "#f0f0f8",
-
-    card: "#0e0e1c",
-    cardForeground: "#f0f0f8",
-
-    primary: "#818CF8",
-    primaryForeground: "#06060F",
-
-    secondary: "#13132a",
-    secondaryForeground: "#e8e8f8",
-
-    muted: "#13132a",
-    mutedForeground: "#6666a0",
-
-    accent: "#6366F1",
-    accentForeground: "#ffffff",
-
-    destructive: "#F43F5E",
-    destructiveForeground: "#ffffff",
-
-    border: "#1e1e38",
-    input: "#1e1e38",
-
-    success: "#10B981",
-    warning: "#F59E0B",
+    text: "#F0F0F8",
+    tint: "#4B9EFF",
+    background: "#0B0B14",
+    foreground: "#F0F0F8",
+    card: "#141421",
+    cardForeground: "#F0F0F8",
+    primary: "#4B9EFF",
+    primaryForeground: "#FFFFFF",
+    secondary: "#1A1A2A",
+    secondaryForeground: "#E0E0F0",
+    muted: "#1A1A2A",
+    mutedForeground: "#707088",
+    accent: "#2EC4A7",
+    accentForeground: "#FFFFFF",
+    destructive: "#F04848",
+    destructiveForeground: "#FFFFFF",
+    border: "#1E1E32",
+    input: "#1E1E32",
+    success: "#2EC4A7",
+    warning: "#F5A623",
+    spendingCard: "#0F1E40",
   },
-
-  radius: 16,
+  radius: 14,
 };
 
 export default colors;

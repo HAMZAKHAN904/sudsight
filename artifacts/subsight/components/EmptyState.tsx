@@ -11,37 +11,18 @@ interface EmptyStateProps {
   onAction?: () => void;
 }
 
-export function EmptyState({
-  title,
-  description,
-  icon = "grid-outline",
-  actionLabel,
-  onAction,
-}: EmptyStateProps) {
+export function EmptyState({ title, description, icon = "grid-outline", actionLabel, onAction }: EmptyStateProps) {
   const colors = useColors();
-
   return (
     <View style={styles.container}>
-      <View
-        style={[
-          styles.iconWrap,
-          { backgroundColor: colors.primary + "18" },
-        ]}
-      >
+      <View style={[styles.iconWrap, { backgroundColor: colors.primary + "18" }]}>
         <Ionicons name={icon} size={36} color={colors.primary} />
       </View>
       <Text style={[styles.title, { color: colors.foreground }]}>{title}</Text>
-      <Text style={[styles.desc, { color: colors.mutedForeground }]}>
-        {description}
-      </Text>
+      <Text style={[styles.desc, { color: colors.mutedForeground }]}>{description}</Text>
       {actionLabel && onAction && (
-        <TouchableOpacity
-          onPress={onAction}
-          style={[styles.btn, { backgroundColor: colors.primary }]}
-        >
-          <Text style={[styles.btnText, { color: colors.primaryForeground }]}>
-            {actionLabel}
-          </Text>
+        <TouchableOpacity onPress={onAction} style={[styles.btn, { backgroundColor: colors.primary }]}>
+          <Text style={[styles.btnText, { color: colors.primaryForeground }]}>{actionLabel}</Text>
         </TouchableOpacity>
       )}
     </View>

@@ -1,17 +1,8 @@
-import React, { useEffect, useRef } from "react";
-import {
-  Animated as RNAnimated,
-  Easing,
-  Platform,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
+import React, { useEffect, useRef, useState } from "react";
+import { Animated as RNAnimated, Easing, Platform, StyleSheet, Text, View } from "react-native";
 import { useColors } from "@/hooks/useColors";
 import { formatCurrency } from "@/utils/currency";
 import { Subscription, getTotalMonthlyBurn, getTotalYearlyBurn } from "@/utils/calculations";
-import { Ionicons } from "@expo/vector-icons";
 
 interface BurnCardProps {
   subscriptions: Subscription[];
@@ -19,161 +10,154 @@ interface BurnCardProps {
   activeCount: number;
 }
 
-function AnimatedTicker({ value, currency }: { value: number; currency: string }) {
-  const animatedValue = useRef(new RNAnimated.Value(0)).current;
-  const displayValue = useRef(value);
+function AnimatedAmount({ value, currency }: { value: number; currency: string }) {
+  const animVal = useRef(new RNAnimated.Value(0)).current;
+  const [display, setDisplay] = useState(formatCurrency(value, currency));
 
   useEffect(() => {
-    const anim = RNAnimated.timing(animatedValue, {
+    const anim = RNAnimated.timing(animVal, {
       toValue: value,
-      duration: 1200,
+      duration: 1000,
       easing: Easing.out(Easing.cubic),
       useNativeDriver: false,
     });
     anim.start();
-
-    const listener = animatedValue.addListener(({ value: v }) => {
-      displayValue.current = v;
+    const id = animVal.addListener(({ value: v }) => {
+      setDisplay(formatCurrency(v, currency));
     });
-
     return () => {
-      animatedValue.removeListener(listener);
+      animVal.removeListener(id);
       anim.stop();
     };
-  }, [value, animatedValue]);
+  }, [value, currency, animVal]);
 
-  const colors = useColors();
-  const [displayText, setDisplayText] = React.useState(
-    formatCurrency(value, currency)
-  );
-
-  useEffect(() => {
-    const id = animatedValue.addListener(({ value: v }) => {
-      setDisplayText(formatCurrency(v, currency));
-    });
-    return () => animatedValue.removeListener(id);
-  }, [animatedValue, currency]);
-
-  return (
-    <Text style={[styles.burnAmount, { color: colors.primaryForeground }]}>
-      {displayText}
-    </Text>
-  );
+  return <Text style={styles.amount}>{display}</Text>;
 }
 
 export function BurnCard({ subscriptions, currency, activeCount }: BurnCardProps) {
   const colors = useColors();
   const monthly = getTotalMonthlyBurn(subscriptions);
   const yearly = getTotalYearlyBurn(subscriptions);
+  const daily = monthly / 30.44;
+
+  const progressWidth = useRef(new RNAnimated.Value(0)).current;
+
+  useEffect(() => {
+    RNAnimated.timing(progressWidth, {
+      toValue: Math.min((monthly / 500) * 100, 100),
+      duration: 1200,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    }).start();
+  }, [monthly, progressWidth]);
 
   return (
-    <LinearGradient
-      colors={["#6366F1", "#818CF8", "#a5b4fc"]}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      style={styles.card}
-    >
-      <View style={styles.header}>
-        <Text style={[styles.label, { color: "rgba(255,255,255,0.75)" }]}>
-          Monthly Burn
-        </Text>
-        <View style={styles.badge}>
-          <Ionicons name="flash" size={12} color="rgba(255,255,255,0.9)" />
-          <Text style={styles.badgeText}>{activeCount} active</Text>
-        </View>
+    <View style={[styles.card, { backgroundColor: "#0F1E40" }]}>
+      <View style={styles.cardGlow} />
+      <Text style={styles.cardLabel}>MONTHLY SPENDING</Text>
+      <AnimatedAmount value={monthly} currency={currency} />
+
+      <View style={styles.progressTrack}>
+        <RNAnimated.View
+          style={[
+            styles.progressFill,
+            {
+              width: progressWidth.interpolate({
+                inputRange: [0, 100],
+                outputRange: ["0%", "100%"],
+              }),
+            },
+          ]}
+        />
       </View>
 
-      <AnimatedTicker value={monthly} currency={currency} />
-
-      <View style={styles.footer}>
-        <View style={styles.footerItem}>
-          <Text style={styles.footerLabel}>Per Year</Text>
-          <Text style={styles.footerValue}>{formatCurrency(yearly, currency)}</Text>
+      <View style={styles.statsRow}>
+        <View style={styles.statItem}>
+          <Text style={styles.statLabel}>Yearly</Text>
+          <Text style={styles.statValue}>{formatCurrency(yearly, currency)}</Text>
         </View>
-        <View style={styles.divider} />
-        <View style={styles.footerItem}>
-          <Text style={styles.footerLabel}>Per Day</Text>
-          <Text style={styles.footerValue}>
-            {formatCurrency(monthly / 30.44, currency)}
-          </Text>
+        <View style={styles.statDivider} />
+        <View style={styles.statItem}>
+          <Text style={[styles.statLabel, { color: "#4B9EFF" }]}>Services</Text>
+          <Text style={[styles.statValue, { color: "#4B9EFF" }]}>{activeCount}</Text>
+        </View>
+        <View style={styles.statDivider} />
+        <View style={styles.statItem}>
+          <Text style={styles.statLabel}>Daily</Text>
+          <Text style={styles.statValue}>{formatCurrency(daily, currency)}</Text>
         </View>
       </View>
-    </LinearGradient>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius: 24,
-    padding: 24,
-    gap: 8,
+    borderRadius: 20,
+    padding: 22,
+    overflow: "hidden",
     ...(Platform.OS === "ios"
-      ? {
-          shadowColor: "#6366F1",
-          shadowOpacity: 0.4,
-          shadowRadius: 20,
-          shadowOffset: { width: 0, height: 8 },
-        }
+      ? { shadowColor: "#4B9EFF", shadowOpacity: 0.25, shadowRadius: 20, shadowOffset: { width: 0, height: 6 } }
       : { elevation: 8 }),
   },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+  cardGlow: {
+    position: "absolute",
+    right: -40,
+    top: -40,
+    width: 180,
+    height: 180,
+    borderRadius: 90,
+    backgroundColor: "rgba(75,158,255,0.08)",
   },
-  label: {
-    fontSize: 14,
-    fontFamily: "Inter_500Medium",
-    letterSpacing: 0.5,
+  cardLabel: {
+    fontSize: 11,
+    color: "#4B9EFF",
+    fontFamily: "Inter_600SemiBold",
+    letterSpacing: 1.2,
+    textTransform: "uppercase",
+    marginBottom: 8,
   },
-  badge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    backgroundColor: "rgba(255,255,255,0.2)",
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 100,
-  },
-  badgeText: {
-    fontSize: 12,
-    color: "rgba(255,255,255,0.9)",
-    fontFamily: "Inter_500Medium",
-  },
-  burnAmount: {
-    fontSize: 44,
+  amount: {
+    fontSize: 42,
+    color: "#FFFFFF",
     fontFamily: "Inter_700Bold",
     letterSpacing: -1,
-    marginTop: 4,
+    marginBottom: 16,
   },
-  footer: {
+  progressTrack: {
+    height: 3,
+    backgroundColor: "rgba(255,255,255,0.12)",
+    borderRadius: 2,
+    marginBottom: 20,
+    overflow: "hidden",
+  },
+  progressFill: {
+    height: "100%",
+    backgroundColor: "#2EC4A7",
+    borderRadius: 2,
+  },
+  statsRow: {
     flexDirection: "row",
-    marginTop: 12,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: "rgba(255,255,255,0.2)",
-    gap: 16,
     alignItems: "center",
   },
-  footerItem: {
+  statItem: {
     flex: 1,
-    gap: 2,
+    alignItems: "center",
+    gap: 3,
   },
-  footerLabel: {
+  statLabel: {
     fontSize: 11,
-    color: "rgba(255,255,255,0.6)",
+    color: "rgba(255,255,255,0.5)",
     fontFamily: "Inter_400Regular",
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
   },
-  footerValue: {
-    fontSize: 15,
-    color: "rgba(255,255,255,0.95)",
+  statValue: {
+    fontSize: 14,
+    color: "#FFFFFF",
     fontFamily: "Inter_600SemiBold",
   },
-  divider: {
+  statDivider: {
     width: 1,
     height: 28,
-    backgroundColor: "rgba(255,255,255,0.2)",
+    backgroundColor: "rgba(255,255,255,0.12)",
   },
 });

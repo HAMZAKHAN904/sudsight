@@ -6,6 +6,14 @@ export type BillingCycle =
   | "yearly"
   | "custom";
 
+export type PaymentMethod =
+  | "credit_card"
+  | "debit_card"
+  | "paypal"
+  | "apple_pay"
+  | "google_pay"
+  | "other";
+
 export interface Subscription {
   id: string;
   name: string;
@@ -19,6 +27,7 @@ export interface Subscription {
   is_active: boolean;
   notes?: string;
   currency: string;
+  payment_method: PaymentMethod;
   created_at: string;
 }
 
@@ -52,11 +61,7 @@ export function getTotalMonthlyBurn(subscriptions: Subscription[]): number {
     .reduce(
       (total, sub) =>
         total +
-        getMonthlyEquivalent(
-          sub.cost,
-          sub.billing_cycle,
-          sub.custom_cycle_days
-        ),
+        getMonthlyEquivalent(sub.cost, sub.billing_cycle, sub.custom_cycle_days),
       0
     );
 }
@@ -84,21 +89,44 @@ export function getMonthlyByCategory(
     );
 }
 
+export function getMonthlyByPaymentMethod(
+  subscriptions: Subscription[]
+): Record<PaymentMethod, number> {
+  return subscriptions
+    .filter((s) => s.is_active)
+    .reduce(
+      (acc, sub) => {
+        const monthly = getMonthlyEquivalent(
+          sub.cost,
+          sub.billing_cycle,
+          sub.custom_cycle_days
+        );
+        acc[sub.payment_method] = (acc[sub.payment_method] || 0) + monthly;
+        return acc;
+      },
+      {} as Record<PaymentMethod, number>
+    );
+}
+
 export function getCycleLabel(cycle: BillingCycle, customDays?: number): string {
   switch (cycle) {
-    case "weekly":
-      return "Weekly";
-    case "biweekly":
-      return "Bi-Weekly";
-    case "monthly":
-      return "Monthly";
-    case "quarterly":
-      return "Quarterly";
-    case "yearly":
-      return "Yearly";
-    case "custom":
-      return `Every ${customDays ?? "?"} days`;
-    default:
-      return "Monthly";
+    case "weekly":       return "Weekly";
+    case "biweekly":     return "Bi-Weekly";
+    case "monthly":      return "Monthly";
+    case "quarterly":    return "Quarterly";
+    case "yearly":       return "Yearly";
+    case "custom":       return `Every ${customDays ?? "?"} days`;
+    default:             return "Monthly";
+  }
+}
+
+export function getPaymentMethodLabel(method: PaymentMethod): string {
+  switch (method) {
+    case "credit_card":  return "Credit Card";
+    case "debit_card":   return "Debit Card";
+    case "paypal":       return "PayPal";
+    case "apple_pay":    return "Apple Pay";
+    case "google_pay":   return "Google Pay";
+    default:             return "Other";
   }
 }
