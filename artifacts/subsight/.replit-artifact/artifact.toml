@@ -1,0 +1,27 @@
+kind = "mobile"
+previewPath = "/"
+title = "Subsight"
+version = "1.0.0"
+id = "artifacts/subsight"
+router = "expo-domain"
+
+[[integratedSkills]]
+name = "expo"
+version = "1.0.0"
+
+[[services]]
+ensurePreviewReachable = "/status"
+name = "expo"
+paths = [ "/" ]
+localPort = 23246
+
+[services.development]
+run = "pnpm --filter @workspace/subsight run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/subsight", "run", "build" ]
+run = [ "pnpm", "--filter", "@workspace/subsight", "run", "serve" ]
+
+[services.env]
+PORT = "23246"
+BASE_PATH = "/"

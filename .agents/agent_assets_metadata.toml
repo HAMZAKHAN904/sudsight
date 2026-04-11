@@ -1,0 +1,8 @@
+uploads = []
+outputs = []
+
+[[generated]]
+id = "M-ZUFkTkumPqsYGAJGLcm"
+uri = "file://artifacts/subsight/assets/images/icon.png"
+type = "image"
+title = "subsight app icon"
