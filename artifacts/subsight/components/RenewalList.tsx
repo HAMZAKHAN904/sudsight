@@ -1,47 +1,62 @@
 import React from "react";
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View, Platform } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useColors } from "@/hooks/useColors";
 import { Subscription } from "@/utils/calculations";
 import { getNextRenewalDate, getDaysUntilRenewal } from "@/utils/dates";
-import { CategoryIcon } from "./CategoryIcon";
+import { getCategoryInfo } from "./CategoryIcon";
 import { formatCurrency } from "@/utils/currency";
 import { Ionicons } from "@expo/vector-icons";
 
-interface RenewalListProps {
-  subscriptions: Subscription[];
-  currency: string;
+function urgencyGradient(days: number): [string, string] {
+  if (days <= 3) return ["#F04848", "#C0392B"];
+  if (days <= 7) return ["#F5A623", "#D4881C"];
+  return ["rgba(255,255,255,0.12)", "rgba(255,255,255,0.06)"];
 }
 
 function RenewalChip({ sub, currency }: { sub: Subscription; currency: string }) {
   const colors = useColors();
   const nextDate = getNextRenewalDate(new Date(sub.start_date), sub.billing_cycle, sub.custom_cycle_days);
   const days = getDaysUntilRenewal(nextDate);
-  const isUrgent = days <= 3;
-  const isSoon  = days <= 7;
-  const badgeBg = isUrgent ? "#F04848" : isSoon ? "#F5A623" : "rgba(255,255,255,0.1)";
-  const badgeText = (isUrgent || isSoon) ? "#FFF" : colors.mutedForeground;
+  const catInfo = getCategoryInfo(sub.category);
+  const grad = urgencyGradient(days);
+  const isUrgent = days <= 7;
   const dayLabel = days === 0 ? "Today" : `${days}d`;
 
   return (
     <TouchableOpacity
       onPress={() => router.push(`/subscription/${sub.id}`)}
-      style={[styles.chip, { backgroundColor: colors.card, borderColor: colors.border }]}
+      activeOpacity={0.8}
+      style={styles.chipOuter}
     >
-      <CategoryIcon categoryId={sub.category} size={44} />
-      <Text style={[styles.name, { color: colors.foreground }]} numberOfLines={1}>{sub.name}</Text>
-      <View style={[styles.badge, { backgroundColor: badgeBg }]}>
-        <Text style={[styles.badgeText, { color: badgeText }]}>{dayLabel}</Text>
+      <View style={[styles.chip, { backgroundColor: "#141421", borderColor: "rgba(255,255,255,0.07)" }]}>
+        {/* Icon */}
+        <View style={[styles.chipIcon, { backgroundColor: catInfo.color + "18", borderColor: catInfo.color + "35" }]}>
+          <Ionicons name={catInfo.icon as never} size={22} color={catInfo.color} />
+        </View>
+
+        <Text style={styles.chipName} numberOfLines={1}>{sub.name}</Text>
+
+        {/* Days badge */}
+        <LinearGradient colors={grad} style={styles.dayBadge} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+          <Text style={[styles.dayText, { color: isUrgent ? "#FFF" : "rgba(255,255,255,0.5)" }]}>{dayLabel}</Text>
+        </LinearGradient>
+
+        <Text style={styles.chipCost}>{formatCurrency(sub.cost, currency)}</Text>
       </View>
-      <Text style={[styles.cost, { color: colors.mutedForeground }]}>
-        {formatCurrency(sub.cost, currency)}
-      </Text>
     </TouchableOpacity>
   );
 }
 
+interface RenewalListProps {
+  subscriptions: Subscription[];
+  currency: string;
+}
+
 export function RenewalList({ subscriptions, currency }: RenewalListProps) {
   const colors = useColors();
+
   const upcoming = subscriptions
     .filter((s) => s.is_active)
     .map((s) => ({
@@ -57,17 +72,21 @@ export function RenewalList({ subscriptions, currency }: RenewalListProps) {
 
   return (
     <View>
+      {/* Section header */}
       <View style={styles.header}>
-        <View style={styles.titleRow}>
-          <Ionicons name="notifications" size={18} color={colors.warning} />
-          <Text style={[styles.title, { color: colors.foreground }]}>Upcoming Renewals</Text>
+        <View style={styles.headerLeft}>
+          <View style={styles.bellWrap}>
+            <Ionicons name="notifications" size={15} color="#F5A623" />
+          </View>
+          <Text style={styles.sectionTitle}>Upcoming Renewals</Text>
         </View>
         {urgentCount > 0 && (
-          <View style={[styles.countBadge, { backgroundColor: colors.warning }]}>
+          <LinearGradient colors={["#F5A623", "#D4881C"]} style={styles.countBadge}>
             <Text style={styles.countText}>{urgentCount}</Text>
-          </View>
+          </LinearGradient>
         )}
       </View>
+
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -88,19 +107,29 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     marginBottom: 12,
   },
-  titleRow: {
+  headerLeft: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+    gap: 8,
   },
-  title: {
+  bellWrap: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    backgroundColor: "rgba(245,166,35,0.12)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  sectionTitle: {
     fontSize: 17,
+    color: "#F0F0F8",
     fontFamily: "Inter_600SemiBold",
+    letterSpacing: -0.2,
   },
   countBadge: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -111,32 +140,47 @@ const styles = StyleSheet.create({
   },
   scroll: {
     gap: 10,
-    paddingRight: 4,
+    paddingRight: 2,
+  },
+  chipOuter: {
+    ...(Platform.OS === "ios"
+      ? { shadowColor: "#000", shadowOpacity: 0.25, shadowRadius: 10, shadowOffset: { width: 0, height: 4 } }
+      : { elevation: 4 }),
   },
   chip: {
-    width: 110,
-    borderRadius: 14,
+    width: 112,
+    borderRadius: 16,
     borderWidth: 1,
     padding: 14,
     alignItems: "center",
-    gap: 7,
+    gap: 8,
   },
-  name: {
+  chipIcon: {
+    width: 46,
+    height: 46,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+  },
+  chipName: {
     fontSize: 12,
+    color: "#F0F0F8",
     fontFamily: "Inter_500Medium",
     textAlign: "center",
   },
-  badge: {
-    paddingHorizontal: 10,
+  dayBadge: {
+    paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: 100,
   },
-  badgeText: {
-    fontSize: 12,
+  dayText: {
+    fontSize: 11,
     fontFamily: "Inter_700Bold",
   },
-  cost: {
+  chipCost: {
     fontSize: 11,
+    color: "rgba(255,255,255,0.35)",
     fontFamily: "Inter_400Regular",
   },
 });

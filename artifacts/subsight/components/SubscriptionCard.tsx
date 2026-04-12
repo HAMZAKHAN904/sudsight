@@ -1,27 +1,33 @@
 import React from "react";
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Platform, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import Animated, { FadeInDown } from "react-native-reanimated";
+import { LinearGradient } from "expo-linear-gradient";
 import { useColors } from "@/hooks/useColors";
-import { Subscription, getCycleLabel, getMonthlyEquivalent, getPaymentMethodLabel } from "@/utils/calculations";
+import { Subscription, getMonthlyEquivalent, getPaymentMethodLabel } from "@/utils/calculations";
 import { formatCurrency } from "@/utils/currency";
 import { getNextRenewalDate, getDaysUntilRenewal } from "@/utils/dates";
-import { CategoryIcon, getCategoryInfo } from "./CategoryIcon";
+import { getCategoryInfo } from "./CategoryIcon";
 import { Ionicons } from "@expo/vector-icons";
 
-function getUrgencyColor(days: number): string {
-  if (days <= 3)  return "#F04848";
-  if (days <= 7)  return "#F5A623";
-  return "#2EC4A7";
+function getUrgencyColors(days: number): { bg: string; text: string; border: string } {
+  if (days <= 3)  return { bg: "#F04848",  text: "#FFF",   border: "#F04848" };
+  if (days <= 7)  return { bg: "#F5A623",  text: "#FFF",   border: "#F5A623" };
+  return           { bg: "rgba(255,255,255,0.07)", text: "rgba(255,255,255,0.45)", border: "transparent" };
+}
+
+function getBorderGradient(days: number, catColor: string): [string, string] {
+  if (days <= 3) return ["#F04848", "#FF6B6B"];
+  if (days <= 7) return ["#F5A623", "#FFD93D"];
+  return [catColor + "AA", catColor + "44"];
 }
 
 function DaysBadge({ days }: { days: number }) {
-  const bg = days <= 3 ? "#F04848" : days <= 7 ? "#F5A623" : "rgba(255,255,255,0.1)";
-  const text = days <= 3 ? "#FFFFFF" : days <= 7 ? "#FFFFFF" : "rgba(255,255,255,0.5)";
+  const c = getUrgencyColors(days);
   const label = days === 0 ? "Today" : days === 1 ? "1d left" : `${days}d left`;
   return (
-    <View style={[styles.badge, { backgroundColor: bg }]}>
-      <Ionicons name="calendar-outline" size={10} color={text} />
-      <Text style={[styles.badgeText, { color: text }]}>{label}</Text>
+    <View style={[styles.badge, { backgroundColor: c.bg }]}>
+      <Ionicons name="time-outline" size={10} color={c.text} />
+      <Text style={[styles.badgeText, { color: c.text }]}>{label}</Text>
     </View>
   );
 }
@@ -29,7 +35,8 @@ function DaysBadge({ days }: { days: number }) {
 function CategoryPill({ categoryId }: { categoryId: string }) {
   const cat = getCategoryInfo(categoryId);
   return (
-    <View style={[styles.pill, { backgroundColor: cat.color + "22" }]}>
+    <View style={[styles.pill, { backgroundColor: cat.color + "1A" }]}>
+      <View style={[styles.pillDot, { backgroundColor: cat.color }]} />
       <Text style={[styles.pillText, { color: cat.color }]}>{cat.label}</Text>
     </View>
   );
@@ -44,58 +51,62 @@ interface SubscriptionCardProps {
 
 function SubscriptionCardInner({ subscription, currency, onPress, index = 0 }: SubscriptionCardProps) {
   const colors = useColors();
-  const monthly = getMonthlyEquivalent(
-    subscription.cost,
-    subscription.billing_cycle,
-    subscription.custom_cycle_days
-  );
-  const nextRenewal = getNextRenewalDate(
-    new Date(subscription.start_date),
-    subscription.billing_cycle,
-    subscription.custom_cycle_days
-  );
+  const monthly = getMonthlyEquivalent(subscription.cost, subscription.billing_cycle, subscription.custom_cycle_days);
+  const nextRenewal = getNextRenewalDate(new Date(subscription.start_date), subscription.billing_cycle, subscription.custom_cycle_days);
   const days = getDaysUntilRenewal(nextRenewal);
-  const borderColor = getUrgencyColor(days);
+  const catInfo = getCategoryInfo(subscription.category);
+  const borderGrad = getBorderGradient(days, catInfo.color);
 
   return (
-    <Animated.View entering={FadeInDown.delay(index * 50).springify().damping(16)}>
+    <Animated.View entering={FadeInDown.delay(index * 60).springify().damping(18)}>
       <TouchableOpacity
         onPress={onPress}
-        style={[
-          styles.card,
-          {
-            backgroundColor: colors.card,
-            borderColor: colors.border,
-            opacity: subscription.is_active ? 1 : 0.5,
-          },
-        ]}
-        activeOpacity={0.75}
+        activeOpacity={0.8}
+        style={[styles.wrapper, { opacity: subscription.is_active ? 1 : 0.45 }]}
       >
-        <View style={[styles.leftBorder, { backgroundColor: borderColor }]} />
-        <View style={styles.iconWrap}>
-          <CategoryIcon categoryId={subscription.category} size={48} />
-        </View>
-        <View style={styles.info}>
-          <Text style={[styles.name, { color: colors.foreground }]} numberOfLines={1}>
-            {subscription.name}
-          </Text>
-          <CategoryPill categoryId={subscription.category} />
-          <View style={styles.meta}>
-            <DaysBadge days={days} />
-            <View style={styles.payRow}>
-              <Ionicons name="card-outline" size={11} color={colors.mutedForeground} />
-              <Text style={[styles.payText, { color: colors.mutedForeground }]}>
-                {getPaymentMethodLabel(subscription.payment_method)}
+        {/* Card body */}
+        <View style={[styles.card, { backgroundColor: "#141421", borderColor: "rgba(255,255,255,0.06)" }]}>
+          {/* Gradient left accent */}
+          <LinearGradient
+            colors={borderGrad}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 0, y: 1 }}
+            style={styles.leftAccent}
+          />
+
+          {/* Icon */}
+          <View style={[styles.iconContainer, { backgroundColor: catInfo.color + "15", borderColor: catInfo.color + "30" }]}>
+            <Ionicons name={catInfo.icon as never} size={22} color={catInfo.color} />
+          </View>
+
+          {/* Info */}
+          <View style={styles.info}>
+            <View style={styles.nameRow}>
+              <Text style={[styles.name, { color: "#F0F0F8" }]} numberOfLines={1}>
+                {subscription.name}
               </Text>
+              {!subscription.is_active && (
+                <View style={styles.pausedBadge}>
+                  <Text style={styles.pausedText}>Paused</Text>
+                </View>
+              )}
+            </View>
+            <CategoryPill categoryId={subscription.category} />
+            <View style={styles.meta}>
+              <DaysBadge days={days} />
+              <View style={styles.payRow}>
+                <Ionicons name="card-outline" size={11} color="rgba(255,255,255,0.3)" />
+                <Text style={styles.payText}>{getPaymentMethodLabel(subscription.payment_method)}</Text>
+              </View>
             </View>
           </View>
-        </View>
-        <View style={styles.priceWrap}>
-          <Text style={[styles.price, { color: colors.foreground }]}>
-            {formatCurrency(monthly, currency)}
-          </Text>
-          <Text style={[styles.perMo, { color: colors.mutedForeground }]}>/mo</Text>
-          <Ionicons name="chevron-forward" size={16} color={colors.mutedForeground} style={{ marginTop: 4 }} />
+
+          {/* Price */}
+          <View style={styles.priceCol}>
+            <Text style={styles.price}>{formatCurrency(monthly, currency)}</Text>
+            <Text style={styles.perMo}>/mo</Text>
+            <Ionicons name="chevron-forward" size={14} color="rgba(255,255,255,0.2)" style={{ marginTop: 6 }} />
+          </View>
         </View>
       </TouchableOpacity>
     </Animated.View>
@@ -105,44 +116,81 @@ function SubscriptionCardInner({ subscription, currency, onPress, index = 0 }: S
 export const SubscriptionCard = React.memo(SubscriptionCardInner);
 
 const styles = StyleSheet.create({
+  wrapper: { marginBottom: 10 },
   card: {
     flexDirection: "row",
     alignItems: "center",
-    borderRadius: 14,
+    borderRadius: 16,
     borderWidth: 1,
-    marginBottom: 10,
     overflow: "hidden",
+    ...(Platform.OS === "ios"
+      ? { shadowColor: "#000", shadowOpacity: 0.3, shadowRadius: 12, shadowOffset: { width: 0, height: 4 } }
+      : { elevation: 4 }),
   },
-  leftBorder: {
+  leftAccent: {
     width: 3,
     alignSelf: "stretch",
   },
-  iconWrap: {
-    padding: 14,
+  iconContainer: {
+    width: 46,
+    height: 46,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    margin: 14,
+    borderWidth: 1,
   },
   info: {
     flex: 1,
-    paddingVertical: 12,
-    gap: 5,
+    paddingVertical: 14,
+    gap: 6,
+    paddingRight: 4,
+  },
+  nameRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
   },
   name: {
-    fontSize: 16,
+    fontSize: 15,
     fontFamily: "Inter_600SemiBold",
+    flex: 1,
+  },
+  pausedBadge: {
+    backgroundColor: "rgba(255,255,255,0.08)",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  pausedText: {
+    fontSize: 9,
+    color: "rgba(255,255,255,0.4)",
+    fontFamily: "Inter_600SemiBold",
+    letterSpacing: 0.5,
   },
   pill: {
     alignSelf: "flex-start",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 6,
   },
+  pillDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+  },
   pillText: {
-    fontSize: 11,
-    fontFamily: "Inter_500Medium",
+    fontSize: 10,
+    fontFamily: "Inter_600SemiBold",
+    letterSpacing: 0.2,
   },
   meta: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    gap: 8,
   },
   badge: {
     flexDirection: "row",
@@ -153,8 +201,9 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   badgeText: {
-    fontSize: 11,
-    fontFamily: "Inter_600SemiBold",
+    fontSize: 10,
+    fontFamily: "Inter_700Bold",
+    letterSpacing: 0.2,
   },
   payRow: {
     flexDirection: "row",
@@ -162,20 +211,25 @@ const styles = StyleSheet.create({
     gap: 3,
   },
   payText: {
-    fontSize: 11,
+    fontSize: 10,
+    color: "rgba(255,255,255,0.3)",
     fontFamily: "Inter_400Regular",
   },
-  priceWrap: {
+  priceCol: {
     alignItems: "flex-end",
-    paddingRight: 12,
-    gap: 0,
+    paddingRight: 14,
+    paddingVertical: 14,
   },
   price: {
-    fontSize: 15,
+    fontSize: 16,
+    color: "#F0F0F8",
     fontFamily: "Inter_700Bold",
+    letterSpacing: -0.3,
   },
   perMo: {
-    fontSize: 11,
+    fontSize: 10,
+    color: "rgba(255,255,255,0.3)",
     fontFamily: "Inter_400Regular",
+    marginTop: 1,
   },
 });

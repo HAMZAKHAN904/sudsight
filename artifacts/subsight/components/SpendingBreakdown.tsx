@@ -1,9 +1,10 @@
 import React from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { Platform, StyleSheet, Text, View } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import { useColors } from "@/hooks/useColors";
 import { getCategoryInfo } from "./CategoryIcon";
 import { formatCurrency } from "@/utils/currency";
-import { Subscription, getMonthlyByCategory, getMonthlyEquivalent } from "@/utils/calculations";
+import { Subscription, getMonthlyByCategory } from "@/utils/calculations";
 
 interface SpendingBreakdownProps {
   subscriptions: Subscription[];
@@ -21,7 +22,7 @@ export function SpendingBreakdown({ subscriptions, currency }: SpendingBreakdown
     .sort((a, b) => b.val - a.val);
 
   const countByCategory: Record<string, number> = {};
-  subscriptions.filter(s => s.is_active).forEach(s => {
+  subscriptions.filter((s) => s.is_active).forEach((s) => {
     countByCategory[s.category] = (countByCategory[s.category] || 0) + 1;
   });
 
@@ -30,23 +31,39 @@ export function SpendingBreakdown({ subscriptions, currency }: SpendingBreakdown
   return (
     <View>
       <View style={styles.header}>
-        <Text style={[styles.title, { color: colors.foreground }]}>Spending Breakdown</Text>
-        <Text style={[styles.serviceCount, { color: colors.mutedForeground }]}>
-          {subscriptions.filter(s => s.is_active).length} services
-        </Text>
+        <Text style={styles.title}>Spending Breakdown</Text>
+        <View style={styles.servicesBadge}>
+          <Text style={styles.servicesText}>
+            {subscriptions.filter((s) => s.is_active).length} services
+          </Text>
+        </View>
       </View>
 
-      <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+      {/* Card */}
+      <View style={[
+        styles.card,
+        { backgroundColor: "#141421", borderColor: "rgba(255,255,255,0.06)" },
+        Platform.OS === "ios"
+          ? { shadowColor: "#000", shadowOpacity: 0.2, shadowRadius: 12, shadowOffset: { width: 0, height: 4 } }
+          : { elevation: 4 },
+      ]}>
         {/* Stacked bar */}
-        <View style={styles.stackedBar}>
-          {entries.map(({ cat, pct }) => {
+        <View style={styles.stackBar}>
+          {entries.map(({ cat, pct }, i) => {
             const info = getCategoryInfo(cat);
             return (
               <View
                 key={cat}
                 style={[
-                  styles.barSegment,
-                  { width: `${pct}%`, backgroundColor: info.color },
+                  styles.barSeg,
+                  {
+                    width: `${pct}%`,
+                    backgroundColor: info.color,
+                    borderTopLeftRadius: i === 0 ? 4 : 0,
+                    borderBottomLeftRadius: i === 0 ? 4 : 0,
+                    borderTopRightRadius: i === entries.length - 1 ? 4 : 0,
+                    borderBottomRightRadius: i === entries.length - 1 ? 4 : 0,
+                  },
                 ]}
               />
             );
@@ -54,31 +71,30 @@ export function SpendingBreakdown({ subscriptions, currency }: SpendingBreakdown
         </View>
 
         {/* Category rows */}
-        {entries.map(({ cat, val, pct }) => {
+        {entries.map(({ cat, val, pct }, i) => {
           const info = getCategoryInfo(cat);
           const count = countByCategory[cat] || 0;
           return (
-            <View key={cat} style={[styles.row, { borderTopColor: colors.border }]}>
+            <View
+              key={cat}
+              style={[
+                styles.row,
+                i < entries.length - 1 && { borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.05)" },
+              ]}
+            >
               <View style={styles.rowLeft}>
-                <View style={[styles.dot, { backgroundColor: info.color }]} />
-                <View>
-                  <Text style={[styles.catName, { color: colors.foreground }]}>{info.label}</Text>
-                  <Text style={[styles.catMeta, { color: colors.mutedForeground }]}>
-                    {count} sub{count !== 1 ? "s" : ""} · {pct.toFixed(0)}%
-                  </Text>
+                <View style={[styles.catDot, { backgroundColor: info.color }]} />
+                <View style={styles.catInfo}>
+                  <Text style={styles.catName}>{info.label}</Text>
+                  <Text style={styles.catMeta}>{count} sub{count !== 1 ? "s" : ""} · {pct.toFixed(0)}%</Text>
                 </View>
               </View>
               <View style={styles.rowRight}>
                 <Text style={[styles.catAmount, { color: info.color }]}>
                   {formatCurrency(val, currency)}
                 </Text>
-                <View style={[styles.catBar, { backgroundColor: colors.border }]}>
-                  <View
-                    style={[
-                      styles.catBarFill,
-                      { width: `${pct}%`, backgroundColor: info.color },
-                    ]}
-                  />
+                <View style={styles.miniBarTrack}>
+                  <View style={[styles.miniBarFill, { width: `${pct}%`, backgroundColor: info.color }]} />
                 </View>
               </View>
             </View>
@@ -98,26 +114,39 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 17,
+    color: "#F0F0F8",
     fontFamily: "Inter_600SemiBold",
+    letterSpacing: -0.2,
   },
-  serviceCount: {
-    fontSize: 13,
-    fontFamily: "Inter_400Regular",
+  servicesBadge: {
+    backgroundColor: "rgba(255,255,255,0.07)",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 100,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+  },
+  servicesText: {
+    fontSize: 11,
+    color: "rgba(255,255,255,0.45)",
+    fontFamily: "Inter_500Medium",
   },
   card: {
-    borderRadius: 14,
+    borderRadius: 18,
     borderWidth: 1,
     overflow: "hidden",
   },
-  stackedBar: {
+  stackBar: {
     flexDirection: "row",
     height: 6,
+    margin: 16,
+    marginBottom: 4,
+    borderRadius: 4,
     overflow: "hidden",
     gap: 2,
   },
-  barSegment: {
+  barSeg: {
     height: "100%",
-    borderRadius: 3,
   },
   row: {
     flexDirection: "row",
@@ -125,7 +154,6 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: 16,
     paddingVertical: 14,
-    borderTopWidth: 1,
   },
   rowLeft: {
     flexDirection: "row",
@@ -133,19 +161,21 @@ const styles = StyleSheet.create({
     gap: 10,
     flex: 1,
   },
-  dot: {
+  catDot: {
     width: 10,
     height: 10,
     borderRadius: 5,
   },
+  catInfo: { gap: 2 },
   catName: {
-    fontSize: 15,
+    fontSize: 14,
+    color: "#F0F0F8",
     fontFamily: "Inter_500Medium",
   },
   catMeta: {
     fontSize: 11,
+    color: "rgba(255,255,255,0.3)",
     fontFamily: "Inter_400Regular",
-    marginTop: 1,
   },
   rowRight: {
     alignItems: "flex-end",
@@ -153,16 +183,18 @@ const styles = StyleSheet.create({
     minWidth: 90,
   },
   catAmount: {
-    fontSize: 15,
-    fontFamily: "Inter_600SemiBold",
+    fontSize: 14,
+    fontFamily: "Inter_700Bold",
+    letterSpacing: -0.2,
   },
-  catBar: {
-    width: 80,
+  miniBarTrack: {
+    width: 70,
     height: 3,
     borderRadius: 2,
+    backgroundColor: "rgba(255,255,255,0.07)",
     overflow: "hidden",
   },
-  catBarFill: {
+  miniBarFill: {
     height: "100%",
     borderRadius: 2,
   },
