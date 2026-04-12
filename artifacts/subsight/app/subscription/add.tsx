@@ -11,6 +11,7 @@ import { useApp } from "@/context/AppContext";
 import { BillingCycle, PaymentMethod, Subscription } from "@/utils/calculations";
 import { CATEGORIES, CategoryId } from "@/components/CategoryIcon";
 import { Ionicons } from "@expo/vector-icons";
+import { useInterstitialAd } from "@/hooks/useInterstitialAd";
 
 function generateId(): string {
   return Date.now().toString() + Math.random().toString(36).substr(2, 9);
@@ -297,6 +298,7 @@ export default function AddSubscriptionScreen() {
   const [step, setStep] = useState<"quick" | "form">("quick");
   const [prefill, setPrefill] = useState<Partial<FormState>>({});
   const [saving, setSaving] = useState(false);
+  const { showAd } = useInterstitialAd();
 
   const topInset = Platform.OS === "web" ? 67 : insets.top;
 
@@ -339,6 +341,7 @@ export default function AddSubscriptionScreen() {
         };
         await addSub(sub);
         await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        await showAd(); // show interstitial ad after saving (native only)
         router.back();
       } catch {
         Alert.alert("Error", "Failed to save subscription.");

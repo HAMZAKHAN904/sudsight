@@ -8,6 +8,7 @@ import { useColors } from "@/hooks/useColors";
 import { useApp } from "@/context/AppContext";
 import { SubscriptionCard } from "@/components/SubscriptionCard";
 import { EmptyState } from "@/components/EmptyState";
+import { AdBanner } from "@/components/AdBanner";
 import { Ionicons } from "@expo/vector-icons";
 import { Subscription } from "@/utils/calculations";
 import { getCategoryInfo, CATEGORIES } from "@/components/CategoryIcon";
@@ -184,6 +185,7 @@ export default function SubscriptionsScreen() {
           { paddingBottom: (Platform.OS === "web" ? 34 : insets.bottom) + 90 },
         ]}
         scrollEnabled={filtered.length > 0}
+        ListHeaderComponent={<AdBanner size="BANNER" />}
         ListEmptyComponent={
           <EmptyState
             title={search ? "No results found" : "No subscriptions yet"}
