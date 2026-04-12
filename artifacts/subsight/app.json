@@ -14,22 +14,9 @@
       "backgroundColor": "#06060F"
     },
     "ios": {
-      "supportsTablet": false,
-      "bundleIdentifier": "com.subsight.app",
-      "infoPlist": {
-        "GADApplicationIdentifier": "ca-app-pub-3940256099942544~1458002511",
-        "SKAdNetworkItems": [
-          { "SKAdNetworkIdentifier": "cstr6suwn9.skadnetwork" }
-        ]
-      }
+      "supportsTablet": false
     },
-    "android": {
-      "package": "com.subsight.app",
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/images/icon.png",
-        "backgroundColor": "#06060F"
-      }
-    },
+    "android": {},
     "web": {
       "favicon": "./assets/images/icon.png"
     },
@@ -41,20 +28,7 @@
         }
       ],
       "expo-font",
-      "expo-web-browser",
-      [
-        "react-native-google-mobile-ads",
-        {
-          "androidAppId": "ca-app-pub-3940256099942544~3347511713",
-          "iosAppId": "ca-app-pub-3940256099942544~1458002511",
-          "userTrackingUsageDescription": "This identifier will be used to show you personalized ads.",
-          "skAdNetworkItems": [
-            "cstr6suwn9.skadnetwork",
-            "4fzdc2evr5.skadnetwork",
-            "4pfyvq9l8r.skadnetwork"
-          ]
-        }
-      ]
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true,

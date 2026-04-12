@@ -12,7 +12,6 @@ import { SubscriptionCard } from "@/components/SubscriptionCard";
 import { SpendingBreakdown } from "@/components/SpendingBreakdown";
 import { EmptyState } from "@/components/EmptyState";
 import { DashboardSkeleton } from "@/components/SkeletonLoader";
-import { AdBanner } from "@/components/AdBanner";
 import { Ionicons } from "@expo/vector-icons";
 import { formatCurrency } from "@/utils/currency";
 import { getTotalMonthlyBurn } from "@/utils/calculations";
@@ -91,9 +90,6 @@ export default function DashboardScreen() {
       <View style={styles.body}>
         {/* Monthly Burn Card */}
         <BurnCard subscriptions={active} currency={currency} activeCount={active.length} />
-
-        {/* Banner ad — only visible in native builds */}
-        <AdBanner size="BANNER" />
 
         {subscriptions.length === 0 ? (
           <EmptyState
