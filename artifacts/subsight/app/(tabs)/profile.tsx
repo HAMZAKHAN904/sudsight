@@ -1,20 +1,40 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
-  Alert, Linking, Modal, Platform, ScrollView,
+  Alert, Linking, Modal, Platform, ScrollView, Share,
   StyleSheet, Switch, Text, TouchableOpacity, View,
 } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { useColors } from "@/hooks/useColors";
 import { useApp } from "@/context/AppContext";
 import { Ionicons } from "@expo/vector-icons";
-import { CURRENCIES } from "@/utils/currency";
-import { getTotalMonthlyBurn, getTotalYearlyBurn } from "@/utils/calculations";
-import { formatCurrency } from "@/utils/currency";
+import { CURRENCIES, formatCurrency, getCurrencySymbol } from "@/utils/currency";
+import {
+  getTotalMonthlyBurn, getTotalYearlyBurn,
+  getMonthlyEquivalent, getCycleLabel,
+} from "@/utils/calculations";
 import { saveSubscriptions } from "@/store/subscriptionStore";
 
 const CONTACT_EMAIL = "h6577122@gmail.com";
 const CONTACT_PHONE = "+923129584661";
+const NOTIF_SETTINGS_KEY = "subsight_notif_settings";
+
+interface NotifSettings {
+  renewalReminders: boolean;
+  remind7: boolean;
+  remind3: boolean;
+  remind1: boolean;
+  weeklyReport: boolean;
+}
+
+const DEFAULT_NOTIF: NotifSettings = {
+  renewalReminders: true,
+  remind7: false,
+  remind3: true,
+  remind1: false,
+  weeklyReport: false,
+};
 
 interface SectionRowProps {
   icon: keyof typeof Ionicons.glyphMap;
@@ -50,17 +70,10 @@ function SectionRow({ icon, iconBg, title, subtitle, onPress, destructive, right
   );
 }
 
-/* ─── Legal modal shell ─────────────────────────────────────────────────── */
 function LegalModal({
-  visible,
-  title,
-  onClose,
-  children,
+  visible, title, onClose, children,
 }: {
-  visible: boolean;
-  title: string;
-  onClose: () => void;
-  children: React.ReactNode;
+  visible: boolean; title: string; onClose: () => void; children: React.ReactNode;
 }) {
   const colors = useColors();
   return (
@@ -72,10 +85,7 @@ function LegalModal({
             <Ionicons name="close" size={20} color={colors.foreground} />
           </TouchableOpacity>
         </View>
-        <ScrollView
-          contentContainerStyle={styles.legalContent}
-          showsVerticalScrollIndicator={false}
-        >
+        <ScrollView contentContainerStyle={styles.legalContent} showsVerticalScrollIndicator={false}>
           {children}
         </ScrollView>
       </View>
@@ -93,12 +103,10 @@ function LegalSection({ title, children }: { title: string; children: string }) 
   );
 }
 
-/* ─── Contact modal ─────────────────────────────────────────────────────── */
 function ContactModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const colors = useColors();
-
-  const handleEmail = () => Linking.openURL(`mailto:${CONTACT_EMAIL}?subject=Subsight Support`);
-  const handlePhone = () => Linking.openURL(`tel:${CONTACT_PHONE}`);
+  const handleEmail    = () => Linking.openURL(`mailto:${CONTACT_EMAIL}?subject=Subsight Support`);
+  const handlePhone    = () => Linking.openURL(`tel:${CONTACT_PHONE}`);
   const handleWhatsApp = () => Linking.openURL(`https://wa.me/${CONTACT_PHONE.replace("+", "")}`);
 
   return (
@@ -110,9 +118,7 @@ function ContactModal({ visible, onClose }: { visible: boolean; onClose: () => v
             <Ionicons name="close" size={20} color={colors.foreground} />
           </TouchableOpacity>
         </View>
-
         <ScrollView contentContainerStyle={styles.contactContent} showsVerticalScrollIndicator={false}>
-          {/* Hero */}
           <View style={styles.contactHero}>
             <LinearGradient colors={["#1E3A6E", "#0F2040"]} style={styles.contactHeroIcon}>
               <Ionicons name="headset" size={34} color="#4B9EFF" />
@@ -123,56 +129,29 @@ function ContactModal({ visible, onClose }: { visible: boolean; onClose: () => v
             </Text>
           </View>
 
-          {/* Cards */}
-          <TouchableOpacity
-            onPress={handleEmail}
-            style={[styles.contactCard, { backgroundColor: "#141421", borderColor: "rgba(255,255,255,0.07)" }]}
-            activeOpacity={0.8}
-          >
-            <View style={[styles.contactCardIcon, { backgroundColor: "#4B9EFF18", borderColor: "#4B9EFF30" }]}>
-              <Ionicons name="mail" size={22} color="#4B9EFF" />
-            </View>
-            <View style={styles.contactCardText}>
-              <Text style={[styles.contactCardLabel, { color: colors.mutedForeground }]}>EMAIL</Text>
-              <Text style={[styles.contactCardValue, { color: colors.foreground }]}>{CONTACT_EMAIL}</Text>
-              <Text style={[styles.contactCardHint, { color: colors.mutedForeground }]}>Tap to open email app</Text>
-            </View>
-            <Ionicons name="open-outline" size={16} color={colors.mutedForeground} />
-          </TouchableOpacity>
+          {[
+            { onPress: handleEmail, bg: "#4B9EFF18", border: "#4B9EFF30", icon: "mail" as const, color: "#4B9EFF", label: "EMAIL", value: CONTACT_EMAIL, hint: "Tap to open email app" },
+            { onPress: handlePhone, bg: "#2EC4A718", border: "#2EC4A730", icon: "call" as const, color: "#2EC4A7", label: "PHONE", value: CONTACT_PHONE, hint: "Tap to call directly" },
+            { onPress: handleWhatsApp, bg: "#25D36618", border: "#25D36630", icon: "logo-whatsapp" as const, color: "#25D366", label: "WHATSAPP", value: CONTACT_PHONE, hint: "Tap to chat on WhatsApp" },
+          ].map(({ onPress, bg, border, icon, color, label, value, hint }) => (
+            <TouchableOpacity
+              key={label}
+              onPress={onPress}
+              style={[styles.contactCard, { backgroundColor: "#141421", borderColor: "rgba(255,255,255,0.07)" }]}
+              activeOpacity={0.8}
+            >
+              <View style={[styles.contactCardIcon, { backgroundColor: bg, borderColor: border }]}>
+                <Ionicons name={icon} size={22} color={color} />
+              </View>
+              <View style={styles.contactCardText}>
+                <Text style={[styles.contactCardLabel, { color: colors.mutedForeground }]}>{label}</Text>
+                <Text style={[styles.contactCardValue, { color: colors.foreground }]}>{value}</Text>
+                <Text style={[styles.contactCardHint,  { color: colors.mutedForeground }]}>{hint}</Text>
+              </View>
+              <Ionicons name="open-outline" size={16} color={colors.mutedForeground} />
+            </TouchableOpacity>
+          ))}
 
-          <TouchableOpacity
-            onPress={handlePhone}
-            style={[styles.contactCard, { backgroundColor: "#141421", borderColor: "rgba(255,255,255,0.07)" }]}
-            activeOpacity={0.8}
-          >
-            <View style={[styles.contactCardIcon, { backgroundColor: "#2EC4A718", borderColor: "#2EC4A730" }]}>
-              <Ionicons name="call" size={22} color="#2EC4A7" />
-            </View>
-            <View style={styles.contactCardText}>
-              <Text style={[styles.contactCardLabel, { color: colors.mutedForeground }]}>PHONE</Text>
-              <Text style={[styles.contactCardValue, { color: colors.foreground }]}>{CONTACT_PHONE}</Text>
-              <Text style={[styles.contactCardHint, { color: colors.mutedForeground }]}>Tap to call directly</Text>
-            </View>
-            <Ionicons name="open-outline" size={16} color={colors.mutedForeground} />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            onPress={handleWhatsApp}
-            style={[styles.contactCard, { backgroundColor: "#141421", borderColor: "rgba(255,255,255,0.07)" }]}
-            activeOpacity={0.8}
-          >
-            <View style={[styles.contactCardIcon, { backgroundColor: "#25D36618", borderColor: "#25D36630" }]}>
-              <Ionicons name="logo-whatsapp" size={22} color="#25D366" />
-            </View>
-            <View style={styles.contactCardText}>
-              <Text style={[styles.contactCardLabel, { color: colors.mutedForeground }]}>WHATSAPP</Text>
-              <Text style={[styles.contactCardValue, { color: colors.foreground }]}>{CONTACT_PHONE}</Text>
-              <Text style={[styles.contactCardHint, { color: colors.mutedForeground }]}>Tap to chat on WhatsApp</Text>
-            </View>
-            <Ionicons name="open-outline" size={16} color={colors.mutedForeground} />
-          </TouchableOpacity>
-
-          {/* Response time note */}
           <View style={[styles.responseBox, { backgroundColor: "#141421", borderColor: "rgba(75,158,255,0.15)" }]}>
             <Ionicons name="time-outline" size={16} color="#4B9EFF" />
             <Text style={[styles.responseText, { color: colors.mutedForeground }]}>
@@ -185,27 +164,96 @@ function ContactModal({ visible, onClose }: { visible: boolean; onClose: () => v
   );
 }
 
-/* ─── Main screen ───────────────────────────────────────────────────────── */
 export default function SettingsScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { subscriptions, currency, setCurrency, refresh } = useApp();
 
-  const [currencyModal, setCurrencyModal]   = useState(false);
-  const [privacyModal, setPrivacyModal]     = useState(false);
-  const [termsModal, setTermsModal]         = useState(false);
-  const [contactModal, setContactModal]     = useState(false);
+  const [currencyModal, setCurrencyModal] = useState(false);
+  const [privacyModal,  setPrivacyModal]  = useState(false);
+  const [termsModal,    setTermsModal]    = useState(false);
+  const [contactModal,  setContactModal]  = useState(false);
 
-  const [renewalReminders, setRenewalReminders] = useState(true);
-  const [remind7, setRemind7] = useState(false);
-  const [remind3, setRemind3] = useState(true);
-  const [remind1, setRemind1] = useState(false);
-  const [weeklyReport, setWeeklyReport] = useState(false);
+  const [notif, setNotif] = useState<NotifSettings>(DEFAULT_NOTIF);
 
   const topInset = Platform.OS === "web" ? 67 : insets.top;
-  const monthly = getTotalMonthlyBurn(subscriptions);
-  const yearly  = getTotalYearlyBurn(subscriptions);
-  const active  = subscriptions.filter((s) => s.is_active).length;
+  const monthly  = getTotalMonthlyBurn(subscriptions);
+  const yearly   = getTotalYearlyBurn(subscriptions);
+  const active   = subscriptions.filter((s) => s.is_active).length;
+
+  // Load persisted notification settings on mount
+  useEffect(() => {
+    AsyncStorage.getItem(NOTIF_SETTINGS_KEY).then((raw) => {
+      if (raw) {
+        try { setNotif({ ...DEFAULT_NOTIF, ...JSON.parse(raw) }); } catch {}
+      }
+    });
+  }, []);
+
+  const updateNotif = (patch: Partial<NotifSettings>) => {
+    const next = { ...notif, ...patch };
+    setNotif(next);
+    AsyncStorage.setItem(NOTIF_SETTINGS_KEY, JSON.stringify(next));
+  };
+
+  // ── Real CSV export using native Share sheet ──────────────────────────────
+  const handleExportCSV = async () => {
+    if (subscriptions.length === 0) {
+      Alert.alert("No Data", "Add some subscriptions first.");
+      return;
+    }
+    const headers = "Name,Cost,Billing Cycle,Category,Status,Payment Method,Start Date,Monthly Equiv";
+    const rows = subscriptions.map((s) => {
+      const m = getMonthlyEquivalent(s.cost, s.billing_cycle, s.custom_cycle_days);
+      const safeStr = (v: string) => `"${v.replace(/"/g, '""')}"`;
+      return [
+        safeStr(s.name),
+        s.cost.toFixed(2),
+        s.billing_cycle,
+        safeStr(s.category),
+        s.is_active ? "Active" : "Paused",
+        s.payment_method,
+        s.start_date,
+        m.toFixed(2),
+      ].join(",");
+    });
+    const csv = `${headers}\n${rows.join("\n")}`;
+    try {
+      await Share.share({ message: csv, title: "Subsight Subscriptions" });
+    } catch {
+      Alert.alert("Error", "Could not share the export.");
+    }
+  };
+
+  // ── Real text summary export ──────────────────────────────────────────────
+  const handleExportSummary = async () => {
+    if (subscriptions.length === 0) {
+      Alert.alert("No Data", "Add some subscriptions first.");
+      return;
+    }
+    const sym = getCurrencySymbol(currency);
+    const line = "─".repeat(38);
+    let text = `SUBSIGHT — SPENDING SUMMARY\n`;
+    text += `Generated: ${new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}\n`;
+    text += `${line}\n\n`;
+    text += `Monthly Total:   ${formatCurrency(monthly, currency)}\n`;
+    text += `Yearly Total:    ${formatCurrency(yearly, currency)}\n`;
+    text += `Active Services: ${active} of ${subscriptions.length}\n\n`;
+    text += `${line}\nSUBSCRIPTIONS\n${line}\n`;
+    subscriptions.forEach((s) => {
+      const m = getMonthlyEquivalent(s.cost, s.billing_cycle, s.custom_cycle_days);
+      const cycleStr = getCycleLabel(s.billing_cycle, s.custom_cycle_days);
+      text += `\n• ${s.name}\n`;
+      text += `  ${sym}${s.cost.toFixed(2)}/${cycleStr}`;
+      if (s.billing_cycle !== "monthly") text += `  (${formatCurrency(m, currency)}/mo)`;
+      text += `\n  ${s.is_active ? "Active" : "Paused"} · ${s.category}\n`;
+    });
+    try {
+      await Share.share({ message: text, title: "Subsight Summary" });
+    } catch {
+      Alert.alert("Error", "Could not share the summary.");
+    }
+  };
 
   const handleClearData = () => {
     Alert.alert(
@@ -231,7 +279,7 @@ export default function SettingsScreen() {
       ]}
       showsVerticalScrollIndicator={false}
     >
-      <Text style={[styles.title, { color: colors.foreground }]}>Settings</Text>
+      <Text style={[styles.title,    { color: colors.foreground }]}>Settings</Text>
       <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>Manage your preferences</Text>
 
       {/* App summary card */}
@@ -256,29 +304,32 @@ export default function SettingsScreen() {
       {/* Stats */}
       <View style={styles.statsRow}>
         {[
-          { val: String(subscriptions.length), label: "Total" },
-          { val: formatCurrency(monthly, currency).replace(/\.00$/, ""), label: "Monthly" },
-          { val: formatCurrency(yearly,  currency).replace(/\.00$/, ""), label: "Yearly" },
-          { val: String(active), label: "Active" },
+          { val: String(subscriptions.length),                             label: "Total",   accent: colors.foreground },
+          { val: formatCurrency(monthly, currency).replace(/\.00$/, ""),  label: "Monthly", accent: "#4B9EFF" },
+          { val: formatCurrency(yearly,  currency).replace(/\.00$/, ""),  label: "Yearly",  accent: "#A855F7" },
+          { val: String(active),                                           label: "Active",  accent: "#2EC4A7" },
         ].map((s, i) => (
           <View key={i} style={[styles.statBox, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Text style={[styles.statVal, { color: i === 2 ? "#A855F7" : i === 1 ? "#4B9EFF" : colors.foreground }]}>
-              {s.val}
-            </Text>
+            <Text style={[styles.statVal,   { color: s.accent }]}>{s.val}</Text>
             <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>{s.label}</Text>
           </View>
         ))}
       </View>
 
-      {/* Currency */}
+      {/* Display */}
       <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <Text style={[styles.sectionTitle, { color: colors.mutedForeground }]}>DISPLAY</Text>
-        <SectionRow icon="cash-outline" iconBg="#4B9EFF" title="Currency" subtitle={currency} onPress={() => setCurrencyModal(true)} isLast />
+        <SectionRow
+          icon="cash-outline" iconBg="#4B9EFF"
+          title="Currency" subtitle={currency}
+          onPress={() => setCurrencyModal(true)} isLast
+        />
       </View>
 
       {/* Notifications */}
       <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <Text style={[styles.sectionTitle, { color: colors.mutedForeground }]}>NOTIFICATIONS</Text>
+
         <View style={[styles.notifRow, { borderBottomColor: colors.border }]}>
           <View style={[styles.rowIcon, { backgroundColor: "#4B9EFF" }]}>
             <Ionicons name="notifications" size={16} color="#FFF" />
@@ -286,19 +337,27 @@ export default function SettingsScreen() {
           <View style={styles.rowText}>
             <Text style={[styles.rowTitle, { color: colors.foreground }]}>Renewal Reminders</Text>
             <Text style={[styles.rowSub, { color: colors.mutedForeground }]}>
-              {renewalReminders ? `${[remind7, remind3, remind1].filter(Boolean).length} reminders scheduled` : "Disabled"}
+              {notif.renewalReminders
+                ? `${[notif.remind7, notif.remind3, notif.remind1].filter(Boolean).length} reminder${[notif.remind7, notif.remind3, notif.remind1].filter(Boolean).length !== 1 ? "s" : ""} active`
+                : "Disabled"}
             </Text>
           </View>
-          <Switch value={renewalReminders} onValueChange={setRenewalReminders} trackColor={{ true: "#4B9EFF", false: colors.border }} thumbColor="#FFF" />
+          <Switch
+            value={notif.renewalReminders}
+            onValueChange={(v) => updateNotif({ renewalReminders: v })}
+            trackColor={{ true: "#4B9EFF", false: colors.border }}
+            thumbColor="#FFF"
+          />
         </View>
-        {renewalReminders && (
+
+        {notif.renewalReminders && (
           <>
             {[
-              { label: "7 days before", sub: "Early heads-up reminder",  val: remind7, set: setRemind7, color: "#4B9EFF" },
-              { label: "3 days before", sub: "Time to prepare payment",   val: remind3, set: setRemind3, color: "#F5A623" },
-              { label: "1 day before",  sub: "Final payment alert",       val: remind1, set: setRemind1, color: "#F04848" },
-            ].map(({ label, sub, val, set, color }) => (
-              <View key={label} style={[styles.subRow, { borderBottomColor: colors.border }]}>
+              { label: "7 days before", sub: "Early heads-up reminder",  key: "remind7" as const, val: notif.remind7, color: "#4B9EFF" },
+              { label: "3 days before", sub: "Time to prepare payment",  key: "remind3" as const, val: notif.remind3, color: "#F5A623" },
+              { label: "1 day before",  sub: "Final payment alert",      key: "remind1" as const, val: notif.remind1, color: "#F04848" },
+            ].map(({ label, sub, key, val, color }) => (
+              <View key={key} style={[styles.subRow, { borderBottomColor: colors.border }]}>
                 <View style={[styles.subNumBadge, { backgroundColor: color + "22" }]}>
                   <Text style={[styles.subNumText, { color }]}>{label.split(" ")[0]}</Text>
                 </View>
@@ -306,11 +365,17 @@ export default function SettingsScreen() {
                   <Text style={[styles.rowTitle, { color: colors.foreground }]}>{label}</Text>
                   <Text style={[styles.rowSub,   { color: colors.mutedForeground }]}>{sub}</Text>
                 </View>
-                <Switch value={val} onValueChange={set} trackColor={{ true: color, false: colors.border }} thumbColor="#FFF" />
+                <Switch
+                  value={val}
+                  onValueChange={(v) => updateNotif({ [key]: v })}
+                  trackColor={{ true: color, false: colors.border }}
+                  thumbColor="#FFF"
+                />
               </View>
             ))}
           </>
         )}
+
         <View style={[styles.notifRow, { borderBottomColor: "transparent" }]}>
           <View style={[styles.rowIcon, { backgroundColor: "#4B9EFF" }]}>
             <Ionicons name="bar-chart" size={16} color="#FFF" />
@@ -319,55 +384,50 @@ export default function SettingsScreen() {
             <Text style={[styles.rowTitle, { color: colors.foreground }]}>Weekly Spending Report</Text>
             <Text style={[styles.rowSub,   { color: colors.mutedForeground }]}>Summary every Monday morning</Text>
           </View>
-          <Switch value={weeklyReport} onValueChange={setWeeklyReport} trackColor={{ true: "#4B9EFF", false: colors.border }} thumbColor="#FFF" />
+          <Switch
+            value={notif.weeklyReport}
+            onValueChange={(v) => updateNotif({ weeklyReport: v })}
+            trackColor={{ true: "#4B9EFF", false: colors.border }}
+            thumbColor="#FFF"
+          />
         </View>
       </View>
 
-      {/* Data */}
+      {/* Data — real exports */}
       <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <Text style={[styles.sectionTitle, { color: colors.mutedForeground }]}>DATA</Text>
-        <SectionRow icon="download-outline" iconBg="#4B9EFF" title="Export as CSV"    subtitle="All subscriptions in spreadsheet format" onPress={() => Alert.alert("Export CSV", "CSV export is available in the published app.")} />
-        <SectionRow icon="document-text-outline" iconBg="#4B9EFF" title="Export Summary" subtitle="Human-readable text report" onPress={() => Alert.alert("Export Summary", "Text summary export is available in the published app.")} isLast />
-      </View>
-
-      {/* Legal */}
-      <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <Text style={[styles.sectionTitle, { color: colors.mutedForeground }]}>LEGAL & SUPPORT</Text>
         <SectionRow
-          icon="shield-checkmark-outline"
-          iconBg="#4B9EFF"
-          title="Privacy Policy"
-          subtitle="How we handle your data"
-          onPress={() => setPrivacyModal(true)}
+          icon="download-outline" iconBg="#4B9EFF"
+          title="Export as CSV"
+          subtitle="All subscriptions in spreadsheet format"
+          onPress={handleExportCSV}
         />
         <SectionRow
-          icon="document-outline"
-          iconBg="#2EC4A7"
-          title="Terms & Conditions"
-          subtitle="Terms of use and your rights"
-          onPress={() => setTermsModal(true)}
-        />
-        <SectionRow
-          icon="headset-outline"
-          iconBg="#F5A623"
-          title="Contact Support"
-          subtitle={`${CONTACT_EMAIL}  ·  ${CONTACT_PHONE}`}
-          onPress={() => setContactModal(true)}
+          icon="document-text-outline" iconBg="#2EC4A7"
+          title="Export Summary"
+          subtitle="Human-readable spending report"
+          onPress={handleExportSummary}
           isLast
         />
+      </View>
+
+      {/* Legal & Support */}
+      <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <Text style={[styles.sectionTitle, { color: colors.mutedForeground }]}>LEGAL & SUPPORT</Text>
+        <SectionRow icon="shield-checkmark-outline" iconBg="#4B9EFF"  title="Privacy Policy"    subtitle="How we handle your data"          onPress={() => setPrivacyModal(true)} />
+        <SectionRow icon="document-outline"         iconBg="#2EC4A7"  title="Terms & Conditions" subtitle="Terms of use and your rights"     onPress={() => setTermsModal(true)} />
+        <SectionRow icon="headset-outline"          iconBg="#F5A623"  title="Contact Support"    subtitle={`${CONTACT_EMAIL}  ·  ${CONTACT_PHONE}`} onPress={() => setContactModal(true)} isLast />
       </View>
 
       {/* Account */}
       <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <Text style={[styles.sectionTitle, { color: colors.mutedForeground }]}>ACCOUNT</Text>
         <SectionRow
-          icon="trash-outline"
-          iconBg="#F04848"
+          icon="trash-outline" iconBg="#F04848"
           title="Clear All Data"
           subtitle="Permanently delete all subscriptions"
           onPress={handleClearData}
-          destructive
-          isLast
+          destructive isLast
         />
       </View>
 
@@ -386,9 +446,14 @@ export default function SettingsScreen() {
           </View>
         </View>
         <Text style={[styles.premiumDesc, { color: colors.mutedForeground }]}>
-          Advanced features and analytics will be available in future updates.
+          Advanced features will be available in future updates.
         </Text>
-        {["Cloud sync across all devices", "PDF export with full formatting", "Unlimited subscription history", "Advanced spending analytics"].map((f) => (
+        {[
+          "Cloud sync across all devices",
+          "PDF export with full formatting",
+          "Unlimited subscription history",
+          "Advanced spending analytics",
+        ].map((f) => (
           <View key={f} style={styles.premiumFeature}>
             <Ionicons name="checkmark-circle-outline" size={16} color="#A855F7" />
             <Text style={[styles.premiumFeatureText, { color: colors.mutedForeground }]}>{f}</Text>
@@ -400,7 +465,7 @@ export default function SettingsScreen() {
 
       {/* ── MODALS ── */}
 
-      {/* Currency picker */}
+      {/* Currency Picker */}
       <Modal visible={currencyModal} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setCurrencyModal(false)}>
         <View style={[styles.modal, { backgroundColor: colors.background }]}>
           <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
@@ -414,7 +479,10 @@ export default function SettingsScreen() {
               <TouchableOpacity
                 key={cur.code}
                 onPress={async () => { await setCurrency(cur.code); setCurrencyModal(false); }}
-                style={[styles.currencyRow, { borderBottomColor: colors.border, backgroundColor: currency === cur.code ? colors.primary + "12" : "transparent" }]}
+                style={[styles.currencyRow, {
+                  borderBottomColor: colors.border,
+                  backgroundColor: currency === cur.code ? colors.primary + "12" : "transparent",
+                }]}
               >
                 <Text style={[styles.currencySymbol, { color: colors.primary }]}>{cur.symbol}</Text>
                 <View style={{ flex: 1 }}>
@@ -431,74 +499,58 @@ export default function SettingsScreen() {
       {/* Privacy Policy */}
       <LegalModal visible={privacyModal} title="Privacy Policy" onClose={() => setPrivacyModal(false)}>
         <Text style={styles.legalDate}>Last updated: April 12, 2026</Text>
-
         <LegalSection title="1. Overview">
-          {`Subsight ("we", "our", or "the app") is committed to protecting your privacy. This Privacy Policy explains how your information is collected, used, and safeguarded when you use our mobile application.\n\nSubsight is a local-only subscription tracker. All data you enter is stored exclusively on your device using AsyncStorage and is never transmitted to our servers or any third party.`}
+          {`Subsight ("we", "our", or "the app") is committed to protecting your privacy. This Privacy Policy explains how your information is collected, used, and safeguarded.\n\nSubsight is a local-only subscription tracker. All data is stored exclusively on your device using AsyncStorage and is never transmitted to our servers or any third party.`}
         </LegalSection>
-
         <LegalSection title="2. Information We Collect">
-          {`We do not collect any personal data. All subscription information you enter — including names, costs, billing dates, and categories — is stored only on your device.\n\nWe do not collect:\n• Your name, email, or contact details\n• Payment card or bank information\n• Location data\n• Usage analytics or crash reports\n• Any data transmitted over the internet`}
+          {`We do not collect any personal data. All subscription information you enter is stored only on your device.\n\nWe do not collect:\n• Your name, email, or contact details\n• Payment card or bank information\n• Location data\n• Usage analytics or crash reports\n• Any data transmitted over the internet`}
         </LegalSection>
-
         <LegalSection title="3. Data Storage">
-          {`All app data is stored locally on your device via AsyncStorage. Clearing the app's storage or uninstalling the app will permanently delete all your data. We have no ability to recover deleted data as we never receive or store it.`}
+          {`All app data is stored locally on your device via AsyncStorage. Uninstalling the app will permanently delete all your data. We have no ability to recover it as we never receive or store it.`}
         </LegalSection>
-
         <LegalSection title="4. Third-Party Services">
           {`Subsight does not integrate with any third-party analytics, advertising, or tracking services. No data leaves your device.`}
         </LegalSection>
-
         <LegalSection title="5. Children's Privacy">
           {`Subsight is not directed at children under 13. We do not knowingly collect information from children.`}
         </LegalSection>
-
         <LegalSection title="6. Changes to This Policy">
-          {`We may update this Privacy Policy from time to time. Any changes will be reflected with an updated "Last updated" date. Continued use of the app after changes constitutes acceptance of the revised policy.`}
+          {`We may update this Privacy Policy from time to time. Changes are reflected with an updated "Last updated" date. Continued use of the app constitutes acceptance of the revised policy.`}
         </LegalSection>
-
         <LegalSection title="7. Contact Us">
-          {`If you have questions about this Privacy Policy, please contact us:\n\nEmail: ${CONTACT_EMAIL}\nPhone: ${CONTACT_PHONE}`}
+          {`If you have questions about this Privacy Policy:\n\nEmail: ${CONTACT_EMAIL}\nPhone: ${CONTACT_PHONE}`}
         </LegalSection>
       </LegalModal>
 
       {/* Terms & Conditions */}
       <LegalModal visible={termsModal} title="Terms & Conditions" onClose={() => setTermsModal(false)}>
         <Text style={styles.legalDate}>Last updated: April 12, 2026</Text>
-
         <LegalSection title="1. Acceptance of Terms">
-          {`By downloading or using Subsight, you agree to be bound by these Terms & Conditions. If you do not agree with any part of these terms, please do not use the app.`}
+          {`By downloading or using Subsight, you agree to be bound by these Terms & Conditions. If you do not agree, please do not use the app.`}
         </LegalSection>
-
         <LegalSection title="2. Use of the App">
-          {`Subsight is provided for personal, non-commercial use. You agree to use the app only for its intended purpose — tracking your personal subscriptions and recurring expenses.\n\nYou must not:\n• Reverse-engineer or decompile the app\n• Use the app for any unlawful purpose\n• Attempt to gain unauthorized access to any systems`}
+          {`Subsight is provided for personal, non-commercial use. You agree to use the app only for its intended purpose — tracking your personal subscriptions.\n\nYou must not:\n• Reverse-engineer or decompile the app\n• Use the app for any unlawful purpose\n• Attempt to gain unauthorized access to any systems`}
         </LegalSection>
-
         <LegalSection title="3. Your Data & Responsibility">
-          {`All data entered into Subsight is stored locally on your device. You are solely responsible for the accuracy of the information you enter and for maintaining backups of your data.\n\nWe are not responsible for any data loss resulting from device failure, app deletion, or OS updates.`}
+          {`All data you enter into Subsight is stored locally on your device. You are solely responsible for the accuracy of your data. We are not liable for any financial decisions made based on information displayed in the app.`}
         </LegalSection>
-
-        <LegalSection title="4. Disclaimer of Warranties">
-          {`Subsight is provided "as is" without warranties of any kind, express or implied. We do not warrant that the app will be error-free, uninterrupted, or free of viruses or other harmful components.\n\nThe financial information displayed in the app is based solely on the data you enter and is provided for informational purposes only. It does not constitute financial advice.`}
+        <LegalSection title="4. Intellectual Property">
+          {`All content, design, code, and trademarks within Subsight are the property of the developer and are protected by applicable intellectual property laws.`}
         </LegalSection>
-
-        <LegalSection title="5. Limitation of Liability">
-          {`To the maximum extent permitted by law, we shall not be liable for any indirect, incidental, special, consequential, or punitive damages arising from your use of or inability to use the app.`}
+        <LegalSection title="5. Disclaimer of Warranties">
+          {`The app is provided "as is" without warranty of any kind. We do not guarantee that the app will be error-free or uninterrupted.`}
         </LegalSection>
-
-        <LegalSection title="6. Intellectual Property">
-          {`All content, design, and code within Subsight are the intellectual property of the app's developer. You may not reproduce, distribute, or create derivative works without prior written consent.`}
+        <LegalSection title="6. Limitation of Liability">
+          {`To the fullest extent permitted by law, we shall not be liable for any indirect, incidental, special, or consequential damages arising from your use of the app.`}
         </LegalSection>
-
         <LegalSection title="7. Changes to Terms">
-          {`We reserve the right to modify these Terms at any time. Continued use of the app following any changes constitutes acceptance of the new Terms.`}
+          {`We reserve the right to modify these terms at any time. Continued use of the app after changes constitutes acceptance of the updated terms.`}
         </LegalSection>
-
-        <LegalSection title="8. Contact">
-          {`For questions regarding these Terms, please contact:\n\nEmail: ${CONTACT_EMAIL}\nPhone: ${CONTACT_PHONE}`}
+        <LegalSection title="8. Contact Us">
+          {`For questions about these Terms:\n\nEmail: ${CONTACT_EMAIL}\nPhone: ${CONTACT_PHONE}`}
         </LegalSection>
       </LegalModal>
 
-      {/* Contact */}
       <ContactModal visible={contactModal} onClose={() => setContactModal(false)} />
     </ScrollView>
   );
@@ -506,140 +558,77 @@ export default function SettingsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  content: { paddingHorizontal: 18, gap: 14 },
-  title: { fontSize: 28, fontFamily: "Inter_700Bold", letterSpacing: -0.5 },
-  subtitle: { fontSize: 13, fontFamily: "Inter_400Regular", marginBottom: 4 },
+  content:   { paddingHorizontal: 18, gap: 12 },
+  title:     { fontSize: 28, fontFamily: "Inter_700Bold", letterSpacing: -0.5, marginBottom: 2 },
+  subtitle:  { fontSize: 13, fontFamily: "Inter_400Regular", marginBottom: 8 },
 
-  appCard: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderRadius: 14, borderWidth: 1, padding: 16 },
+  appCard:     { flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderRadius: 14, borderWidth: 1, padding: 16 },
   appCardLeft: { flexDirection: "row", alignItems: "center", gap: 12 },
-  appIcon: { width: 44, height: 44, borderRadius: 12, alignItems: "center", justifyContent: "center" },
-  appName: { fontSize: 16, fontFamily: "Inter_600SemiBold" },
-  appMeta: { fontSize: 12, fontFamily: "Inter_400Regular", marginTop: 2 },
-  freeBadge: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 100 },
-  freeText: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
+  appIcon:     { width: 46, height: 46, borderRadius: 13, alignItems: "center", justifyContent: "center" },
+  appName:     { fontSize: 17, fontFamily: "Inter_600SemiBold" },
+  appMeta:     { fontSize: 12, fontFamily: "Inter_400Regular", marginTop: 2 },
+  freeBadge:   { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 100 },
+  freeText:    { fontSize: 12, fontFamily: "Inter_600SemiBold" },
 
   statsRow: { flexDirection: "row", gap: 8 },
-  statBox: { flex: 1, borderRadius: 12, borderWidth: 1, padding: 12, alignItems: "center", gap: 4 },
-  statVal: { fontSize: 16, fontFamily: "Inter_700Bold" },
-  statLabel: { fontSize: 10, fontFamily: "Inter_400Regular" },
+  statBox:  { flex: 1, alignItems: "center", borderRadius: 12, borderWidth: 1, paddingVertical: 12, gap: 3 },
+  statVal:  { fontSize: 15, fontFamily: "Inter_700Bold" },
+  statLabel:{ fontSize: 10, fontFamily: "Inter_400Regular" },
 
-  section: { borderRadius: 14, borderWidth: 1, overflow: "hidden" },
-  sectionTitle: { fontSize: 10, fontFamily: "Inter_600SemiBold", letterSpacing: 1, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8 },
+  section:      { borderRadius: 14, borderWidth: 1, overflow: "hidden" },
+  sectionTitle: { fontSize: 11, fontFamily: "Inter_600SemiBold", letterSpacing: 1, textTransform: "uppercase", paddingHorizontal: 16, paddingTop: 14, paddingBottom: 8 },
 
-  row: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 13, gap: 12 },
-  notifRow: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 13, borderBottomWidth: 1, gap: 12 },
-  subRow: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 11, borderBottomWidth: 1, gap: 12, paddingLeft: 28 },
-  subNumBadge: { width: 28, height: 28, borderRadius: 14, alignItems: "center", justifyContent: "center" },
-  subNumText: { fontSize: 11, fontFamily: "Inter_700Bold" },
+  row:     { flexDirection: "row", alignItems: "center", padding: 16, gap: 14 },
   rowIcon: { width: 32, height: 32, borderRadius: 9, alignItems: "center", justifyContent: "center" },
-  rowText: { flex: 1, gap: 2 },
-  rowTitle: { fontSize: 15, fontFamily: "Inter_500Medium" },
-  rowSub: { fontSize: 11, fontFamily: "Inter_400Regular" },
+  rowText: { flex: 1 },
+  rowTitle:{ fontSize: 15, fontFamily: "Inter_500Medium" },
+  rowSub:  { fontSize: 12, fontFamily: "Inter_400Regular", marginTop: 2 },
 
-  premiumCard: { borderRadius: 16, borderWidth: 1, padding: 18, gap: 12 },
-  premiumHeader: { flexDirection: "row", alignItems: "center", gap: 12 },
-  premiumIcon: { width: 44, height: 44, borderRadius: 12, alignItems: "center", justifyContent: "center" },
-  premiumTitle: { fontSize: 17, fontFamily: "Inter_600SemiBold" },
-  comingSoonBadge: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 3 },
-  comingSoonText: { fontSize: 11, fontFamily: "Inter_500Medium", color: "#A855F7" },
-  premiumDesc: { fontSize: 13, fontFamily: "Inter_400Regular", lineHeight: 19 },
+  notifRow:   { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 14, gap: 14, borderBottomWidth: 1 },
+  subRow:     { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 12, paddingLeft: 62, gap: 14, borderBottomWidth: 1 },
+  subNumBadge:{ width: 32, height: 32, borderRadius: 9, alignItems: "center", justifyContent: "center" },
+  subNumText: { fontSize: 13, fontFamily: "Inter_700Bold" },
+
+  premiumCard:    { borderRadius: 16, borderWidth: 1, padding: 18, gap: 10 },
+  premiumHeader:  { flexDirection: "row", alignItems: "center", gap: 12 },
+  premiumIcon:    { width: 44, height: 44, borderRadius: 13, alignItems: "center", justifyContent: "center" },
+  premiumTitle:   { fontSize: 18, fontFamily: "Inter_700Bold" },
+  comingSoonBadge:{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 4 },
+  comingSoonText: { fontSize: 11, fontFamily: "Inter_600SemiBold", color: "#A855F7", letterSpacing: 0.5 },
+  premiumDesc:    { fontSize: 13, fontFamily: "Inter_400Regular", lineHeight: 20 },
   premiumFeature: { flexDirection: "row", alignItems: "center", gap: 8 },
-  premiumFeatureText: { fontSize: 14, fontFamily: "Inter_400Regular" },
-  footer: { textAlign: "center", fontSize: 12, fontFamily: "Inter_400Regular", marginTop: 4 },
+  premiumFeatureText:{ fontSize: 13, fontFamily: "Inter_400Regular" },
 
-  /* Modal shell */
-  modal: { flex: 1 },
-  modalHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-  },
-  modalTitle: { fontSize: 20, fontFamily: "Inter_700Bold" },
-  closeBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: "rgba(255,255,255,0.08)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
+  footer: { fontSize: 12, fontFamily: "Inter_400Regular", textAlign: "center", paddingVertical: 8 },
 
-  /* Legal content */
-  legalContent: { padding: 20, gap: 0, paddingBottom: 60 },
-  legalDate: {
-    fontSize: 12,
-    color: "rgba(255,255,255,0.3)",
-    fontFamily: "Inter_400Regular",
-    marginBottom: 24,
-    fontStyle: "italic",
-  },
-  legalSection: { marginBottom: 24 },
-  legalSectionTitle: {
-    fontSize: 15,
-    fontFamily: "Inter_700Bold",
-    marginBottom: 8,
-    letterSpacing: -0.2,
-  },
-  legalBody: {
-    fontSize: 13,
-    fontFamily: "Inter_400Regular",
-    lineHeight: 21,
-  },
+  modal:        { flex: 1 },
+  modalHeader:  { flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 18, borderBottomWidth: 1 },
+  modalTitle:   { fontSize: 18, fontFamily: "Inter_600SemiBold" },
+  closeBtn:     { padding: 4 },
+  legalContent: { padding: 20, gap: 4 },
+  legalDate:    { fontSize: 12, fontFamily: "Inter_400Regular", color: "#6B7280", marginBottom: 12 },
+  legalSection: { gap: 6, marginBottom: 14 },
+  legalSectionTitle:{ fontSize: 15, fontFamily: "Inter_600SemiBold" },
+  legalBody:    { fontSize: 14, fontFamily: "Inter_400Regular", lineHeight: 22 },
 
-  /* Contact content */
-  contactContent: { padding: 20, gap: 12, paddingBottom: 60 },
-  contactHero: { alignItems: "center", paddingVertical: 24, gap: 12 },
-  contactHeroIcon: {
-    width: 80,
-    height: 80,
-    borderRadius: 24,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    borderColor: "rgba(75,158,255,0.3)",
-  },
-  contactHeroTitle: { fontSize: 22, fontFamily: "Inter_700Bold", letterSpacing: -0.3 },
-  contactHeroSub: { fontSize: 13, fontFamily: "Inter_400Regular", textAlign: "center", lineHeight: 20 },
+  contactContent:  { padding: 20, gap: 14 },
+  contactHero:     { alignItems: "center", paddingVertical: 20, gap: 12 },
+  contactHeroIcon: { width: 80, height: 80, borderRadius: 24, alignItems: "center", justifyContent: "center" },
+  contactHeroTitle:{ fontSize: 22, fontFamily: "Inter_700Bold" },
+  contactHeroSub:  { fontSize: 14, fontFamily: "Inter_400Regular", textAlign: "center", lineHeight: 21 },
 
-  contactCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderRadius: 16,
-    borderWidth: 1,
-    padding: 16,
-    gap: 14,
-  },
-  contactCardIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 14,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-  },
-  contactCardText: { flex: 1, gap: 3 },
-  contactCardLabel: { fontSize: 9, fontFamily: "Inter_600SemiBold", letterSpacing: 1 },
-  contactCardValue: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
-  contactCardHint: { fontSize: 11, fontFamily: "Inter_400Regular" },
+  contactCard:     { flexDirection: "row", alignItems: "center", borderRadius: 14, borderWidth: 1, padding: 16, gap: 14 },
+  contactCardIcon: { width: 50, height: 50, borderRadius: 14, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  contactCardText: { flex: 1, gap: 2 },
+  contactCardLabel:{ fontSize: 10, fontFamily: "Inter_600SemiBold", letterSpacing: 1 },
+  contactCardValue:{ fontSize: 15, fontFamily: "Inter_500Medium" },
+  contactCardHint: { fontSize: 12, fontFamily: "Inter_400Regular" },
 
-  responseBox: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    borderRadius: 12,
-    borderWidth: 1,
-    padding: 14,
-    marginTop: 4,
-  },
-  responseText: { fontSize: 12, fontFamily: "Inter_400Regular", flex: 1, lineHeight: 18 },
+  responseBox:  { flexDirection: "row", alignItems: "center", gap: 10, padding: 14, borderRadius: 12, borderWidth: 1 },
+  responseText: { flex: 1, fontSize: 13, fontFamily: "Inter_400Regular", lineHeight: 20 },
 
-  /* Currency picker */
-  currencyRow: { flexDirection: "row", alignItems: "center", paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1, gap: 14 },
-  currencySymbol: { fontSize: 18, fontFamily: "Inter_700Bold", width: 30, textAlign: "center" },
-  currencyCode: { fontSize: 16, fontFamily: "Inter_600SemiBold" },
-  currencyName: { fontSize: 13, fontFamily: "Inter_400Regular" },
+  currencyRow:    { flexDirection: "row", alignItems: "center", padding: 16, borderBottomWidth: 1, gap: 14 },
+  currencySymbol: { fontSize: 20, fontFamily: "Inter_700Bold", width: 36, textAlign: "center" },
+  currencyCode:   { fontSize: 16, fontFamily: "Inter_600SemiBold" },
+  currencyName:   { fontSize: 13, fontFamily: "Inter_400Regular", marginTop: 2 },
 });

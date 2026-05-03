@@ -10,10 +10,24 @@ import { useColors } from "@/hooks/useColors";
 import { useApp } from "@/context/AppContext";
 import { BillingCycle, PaymentMethod, Subscription } from "@/utils/calculations";
 import { CATEGORIES, CategoryId } from "@/components/CategoryIcon";
+import { getCurrencySymbol } from "@/utils/currency";
 import { Ionicons } from "@expo/vector-icons";
 
 function generateId(): string {
   return Date.now().toString() + Math.random().toString(36).substr(2, 9);
+}
+
+/** Returns the approximate number of days in a billing cycle for start-date math. */
+function getCycleDaysApprox(cycle: BillingCycle, customDays: number): number {
+  switch (cycle) {
+    case "weekly":    return 7;
+    case "biweekly":  return 14;
+    case "monthly":   return 30;
+    case "quarterly": return 91;
+    case "yearly":    return 365;
+    case "custom":    return customDays;
+    default:          return 30;
+  }
 }
 
 interface PopularService {
@@ -25,28 +39,29 @@ interface PopularService {
 }
 
 const POPULAR_SERVICES: PopularService[] = [
-  { name: "Netflix",        price: 15.99, category: "entertainment", icon: "film",             color: "#E50914" },
-  { name: "Spotify",        price: 9.99,  category: "music",         icon: "musical-notes",    color: "#1DB954" },
-  { name: "YouTube",        price: 13.99, category: "entertainment", icon: "logo-youtube",     color: "#FF0000" },
-  { name: "Disney+",        price: 10.99, category: "entertainment", icon: "tv",               color: "#0063E5" },
-  { name: "Apple TV+",      price: 8.99,  category: "entertainment", icon: "logo-apple",       color: "#555555" },
-  { name: "Notion",         price: 8.00,  category: "productivity",  icon: "document-text",    color: "#000000" },
-  { name: "Slack",          price: 7.25,  category: "productivity",  icon: "chatbubbles",      color: "#4A154B" },
-  { name: "Dropbox",        price: 11.99, category: "cloud",         icon: "cloud-upload",     color: "#0061FF" },
-  { name: "Adobe CC",       price: 54.99, category: "productivity",  icon: "color-palette",    color: "#FF0000" },
-  { name: "GitHub",         price: 4.00,  category: "productivity",  icon: "logo-github",      color: "#171515" },
-  { name: "Duolingo",       price: 6.99,  category: "education",     icon: "school",           color: "#58CC02" },
-  { name: "Coursera",       price: 49.00, category: "education",     icon: "book",             color: "#0056D2" },
-  { name: "LinkedIn",       price: 29.99, category: "business",      icon: "business",         color: "#0A66C2" },
-  { name: "Zoom",           price: 14.99, category: "business",      icon: "videocam",         color: "#2D8CFF" },
-  { name: "Salesforce",     price: 25.00, category: "business",      icon: "stats-chart",      color: "#00A1E0" },
+  { name: "Netflix",    price: 15.99, category: "entertainment", icon: "film",           color: "#E50914" },
+  { name: "Spotify",    price: 9.99,  category: "music",         icon: "musical-notes",  color: "#1DB954" },
+  { name: "YouTube",    price: 13.99, category: "entertainment", icon: "logo-youtube",   color: "#FF0000" },
+  { name: "Disney+",    price: 10.99, category: "entertainment", icon: "tv",             color: "#0063E5" },
+  { name: "Apple TV+",  price: 8.99,  category: "entertainment", icon: "logo-apple",     color: "#555555" },
+  { name: "Notion",     price: 8.00,  category: "productivity",  icon: "document-text",  color: "#000000" },
+  { name: "Slack",      price: 7.25,  category: "productivity",  icon: "chatbubbles",    color: "#4A154B" },
+  { name: "Dropbox",    price: 11.99, category: "cloud",         icon: "cloud-upload",   color: "#0061FF" },
+  { name: "Adobe CC",   price: 54.99, category: "productivity",  icon: "color-palette",  color: "#FF0000" },
+  { name: "GitHub",     price: 4.00,  category: "productivity",  icon: "logo-github",    color: "#171515" },
+  { name: "Duolingo",   price: 6.99,  category: "education",     icon: "school",         color: "#58CC02" },
+  { name: "Coursera",   price: 49.00, category: "education",     icon: "book",           color: "#0056D2" },
+  { name: "LinkedIn",   price: 29.99, category: "business",      icon: "business",       color: "#0A66C2" },
+  { name: "Zoom",       price: 14.99, category: "business",      icon: "videocam",       color: "#2D8CFF" },
+  { name: "Salesforce", price: 25.00, category: "business",      icon: "stats-chart",    color: "#00A1E0" },
 ];
 
 const BILLING_CYCLES: { label: string; value: BillingCycle }[] = [
-  { label: "Weekly",   value: "weekly" },
-  { label: "Monthly",  value: "monthly" },
-  { label: "Yearly",   value: "yearly" },
-  { label: "Custom",   value: "custom" },
+  { label: "Weekly",    value: "weekly" },
+  { label: "Monthly",   value: "monthly" },
+  { label: "Quarterly", value: "quarterly" },
+  { label: "Yearly",    value: "yearly" },
+  { label: "Custom",    value: "custom" },
 ];
 
 const PAYMENT_METHODS: { label: string; value: PaymentMethod }[] = [
@@ -58,13 +73,7 @@ const PAYMENT_METHODS: { label: string; value: PaymentMethod }[] = [
   { label: "Other",       value: "other" },
 ];
 
-function ServiceTile({
-  service,
-  onPress,
-}: {
-  service: PopularService;
-  onPress: () => void;
-}) {
+function ServiceTile({ service, onPress }: { service: PopularService; onPress: () => void }) {
   const colors = useColors();
   return (
     <TouchableOpacity
@@ -106,6 +115,9 @@ function DetailsForm({
   onSave: (form: FormState) => void;
 }) {
   const colors = useColors();
+  const { currency } = useApp();
+  const currencySymbol = getCurrencySymbol(currency);
+
   const [form, setForm] = useState<FormState>({
     name: initial.name ?? "",
     cost: initial.cost ?? "",
@@ -119,13 +131,13 @@ function DetailsForm({
 
   const renewalDate = new Date();
   renewalDate.setDate(renewalDate.getDate() + (parseInt(form.daysUntilRenewal, 10) || 30));
-  const renewalStr = renewalDate.toISOString().split("T")[0];
+  const renewalStr = renewalDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 
   const canSave = form.name.trim().length > 0 && parseFloat(form.cost) > 0;
 
   return (
     <ScrollView
-      contentContainerStyle={[styles.formContent]}
+      contentContainerStyle={styles.formContent}
       keyboardShouldPersistTaps="handled"
       showsVerticalScrollIndicator={false}
     >
@@ -152,7 +164,7 @@ function DetailsForm({
       {/* Price */}
       <Text style={[styles.fieldLabel, { color: colors.foreground }]}>Price *</Text>
       <View style={[styles.inputBox, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <Text style={[styles.currencyPrefix, { color: colors.mutedForeground }]}>$</Text>
+        <Text style={[styles.currencyPrefix, { color: colors.mutedForeground }]}>{currencySymbol}</Text>
         <TextInput
           value={form.cost}
           onChangeText={(v) => setForm((p) => ({ ...p, cost: v }))}
@@ -185,6 +197,24 @@ function DetailsForm({
         ))}
       </View>
 
+      {/* Custom days — only shown when cycle is "custom" */}
+      {form.cycle === "custom" && (
+        <>
+          <Text style={[styles.fieldLabel, { color: colors.foreground }]}>Repeat Every (Days) *</Text>
+          <View style={[styles.inputBox, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <TextInput
+              value={form.customDays}
+              onChangeText={(v) => setForm((p) => ({ ...p, customDays: v }))}
+              keyboardType="number-pad"
+              placeholder="30"
+              placeholderTextColor={colors.mutedForeground}
+              style={[styles.inputText, { color: colors.foreground }]}
+            />
+            <Text style={[styles.currencyPrefix, { color: colors.mutedForeground }]}>days</Text>
+          </View>
+        </>
+      )}
+
       {/* Days until renewal */}
       <Text style={[styles.fieldLabel, { color: colors.foreground }]}>Days Until Next Renewal</Text>
       <View style={[styles.inputBox, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -192,11 +222,13 @@ function DetailsForm({
           value={form.daysUntilRenewal}
           onChangeText={(v) => setForm((p) => ({ ...p, daysUntilRenewal: v }))}
           keyboardType="number-pad"
+          placeholder="30"
+          placeholderTextColor={colors.mutedForeground}
           style={[styles.inputText, { color: colors.foreground }]}
         />
       </View>
       <Text style={[styles.renewalHint, { color: colors.primary }]}>
-        Renewal: {renewalStr}
+        Next renewal: {renewalStr}
       </Text>
 
       {/* Category */}
@@ -319,14 +351,19 @@ export default function AddSubscriptionScreen() {
       setSaving(true);
       try {
         const days = parseInt(form.daysUntilRenewal, 10) || 30;
+        const customDays = parseInt(form.customDays, 10) || 30;
+        // Calculate start date correctly: go back (cycleDays - daysUntilRenewal) from today
+        const cycleDays = getCycleDaysApprox(form.cycle, customDays);
+        const daysBack = Math.max(0, cycleDays - days);
         const startDate = new Date();
-        startDate.setDate(startDate.getDate() - (30 - days)); // approximate start
+        startDate.setDate(startDate.getDate() - daysBack);
+
         const sub: Subscription = {
           id: generateId(),
           name: form.name.trim(),
           cost: parseFloat(form.cost),
           billing_cycle: form.cycle,
-          custom_cycle_days: form.cycle === "custom" ? parseInt(form.customDays, 10) || 30 : undefined,
+          custom_cycle_days: form.cycle === "custom" ? customDays : undefined,
           start_date: startDate.toISOString().split("T")[0],
           category: form.category,
           color: CATEGORIES.find((c) => c.id === form.category)?.color ?? "#4B9EFF",
@@ -385,11 +422,7 @@ export default function AddSubscriptionScreen() {
           </Text>
           <View style={styles.grid}>
             {POPULAR_SERVICES.map((service) => (
-              <ServiceTile
-                key={service.name}
-                service={service}
-                onPress={() => handleQuickSelect(service)}
-              />
+              <ServiceTile key={service.name} service={service} onPress={() => handleQuickSelect(service)} />
             ))}
           </View>
           <TouchableOpacity

@@ -18,11 +18,11 @@ import { formatCurrency } from "@/utils/currency";
 import { Ionicons } from "@expo/vector-icons";
 
 const BILLING_CYCLES: { label: string; value: BillingCycle }[] = [
-  { label: "Weekly",   value: "weekly" },
-  { label: "Monthly",  value: "monthly" },
-  { label: "Quarterly",value: "quarterly" },
-  { label: "Yearly",   value: "yearly" },
-  { label: "Custom",   value: "custom" },
+  { label: "Weekly",    value: "weekly" },
+  { label: "Monthly",   value: "monthly" },
+  { label: "Quarterly", value: "quarterly" },
+  { label: "Yearly",    value: "yearly" },
+  { label: "Custom",    value: "custom" },
 ];
 
 const PAYMENT_METHODS: { label: string; value: PaymentMethod }[] = [
@@ -62,18 +62,36 @@ export default function SubscriptionDetailScreen() {
     );
   }
 
-  const nextRenewal = getNextRenewalDate(new Date(startDate), cycle, cycle === "custom" ? parseInt(customDays, 10) || 30 : undefined);
-  const monthly = getMonthlyEquivalent(parseFloat(cost) || 0, cycle, cycle === "custom" ? parseInt(customDays, 10) || 30 : undefined);
+  const nextRenewal = getNextRenewalDate(
+    new Date(startDate),
+    cycle,
+    cycle === "custom" ? parseInt(customDays, 10) || 30 : undefined
+  );
+  const monthly = getMonthlyEquivalent(
+    parseFloat(cost) || 0,
+    cycle,
+    cycle === "custom" ? parseInt(customDays, 10) || 30 : undefined
+  );
   const catInfo = getCategoryInfo(category);
 
   const handleSave = async () => {
+    if (!name.trim()) {
+      Alert.alert("Validation Error", "Please enter a service name.");
+      return;
+    }
+    const parsedCost = parseFloat(cost);
+    if (isNaN(parsedCost) || parsedCost <= 0) {
+      Alert.alert("Validation Error", "Please enter a valid price greater than zero.");
+      return;
+    }
     await updateSub({
       ...sub,
       name: name.trim(),
-      cost: parseFloat(cost) || 0,
+      cost: parsedCost,
       billing_cycle: cycle,
       custom_cycle_days: cycle === "custom" ? parseInt(customDays, 10) || 30 : undefined,
       category,
+      color: CATEGORIES.find((c) => c.id === category)?.color ?? "#4B9EFF",
       start_date: startDate,
       notes: notes.trim() || undefined,
       is_active: isActive,
@@ -86,9 +104,7 @@ export default function SubscriptionDetailScreen() {
   const handleToggle = async () => {
     const next = !isActive;
     setIsActive(next);
-    await Haptics.notificationAsync(
-      next ? Haptics.NotificationFeedbackType.Success : Haptics.NotificationFeedbackType.Warning
-    );
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   };
 
   const handleDelete = () => {
@@ -151,22 +167,46 @@ export default function SubscriptionDetailScreen() {
         <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <View style={styles.fieldRow}>
             <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Name</Text>
-            <TextInput value={name} onChangeText={setName} style={[styles.fieldInput, { color: colors.foreground }]} placeholderTextColor={colors.mutedForeground} />
+            <TextInput
+              value={name}
+              onChangeText={setName}
+              style={[styles.fieldInput, { color: colors.foreground }]}
+              placeholderTextColor={colors.mutedForeground}
+              placeholder="Service name"
+            />
           </View>
           <View style={[styles.divider, { backgroundColor: colors.border }]} />
           <View style={styles.fieldRow}>
             <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Price</Text>
-            <TextInput value={cost} onChangeText={setCost} style={[styles.fieldInput, { color: colors.foreground }]} keyboardType="decimal-pad" placeholderTextColor={colors.mutedForeground} />
+            <TextInput
+              value={cost}
+              onChangeText={setCost}
+              style={[styles.fieldInput, { color: colors.foreground }]}
+              keyboardType="decimal-pad"
+              placeholderTextColor={colors.mutedForeground}
+              placeholder="0.00"
+            />
           </View>
           <View style={[styles.divider, { backgroundColor: colors.border }]} />
           <View style={styles.fieldRow}>
             <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Start</Text>
-            <TextInput value={startDate} onChangeText={setStartDate} style={[styles.fieldInput, { color: colors.foreground }]} placeholderTextColor={colors.mutedForeground} />
+            <TextInput
+              value={startDate}
+              onChangeText={setStartDate}
+              style={[styles.fieldInput, { color: colors.foreground }]}
+              placeholderTextColor={colors.mutedForeground}
+              placeholder="YYYY-MM-DD"
+            />
           </View>
           <View style={[styles.divider, { backgroundColor: colors.border }]} />
           <View style={styles.fieldRow}>
             <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Active</Text>
-            <Switch value={isActive} onValueChange={handleToggle} trackColor={{ true: "#2EC4A7", false: colors.border }} thumbColor="#FFF" />
+            <Switch
+              value={isActive}
+              onValueChange={handleToggle}
+              trackColor={{ true: "#2EC4A7", false: colors.border }}
+              thumbColor="#FFF"
+            />
           </View>
         </View>
 
@@ -177,12 +217,37 @@ export default function SubscriptionDetailScreen() {
             <TouchableOpacity
               key={c.value}
               onPress={() => setCycle(c.value)}
-              style={[styles.chip, { backgroundColor: cycle === c.value ? colors.primary : colors.card, borderColor: cycle === c.value ? colors.primary : colors.border }]}
+              style={[styles.chip, {
+                backgroundColor: cycle === c.value ? colors.primary : colors.card,
+                borderColor: cycle === c.value ? colors.primary : colors.border,
+              }]}
             >
-              <Text style={[styles.chipText, { color: cycle === c.value ? "#FFF" : colors.foreground }]}>{c.label}</Text>
+              <Text style={[styles.chipText, { color: cycle === c.value ? "#FFF" : colors.foreground }]}>
+                {c.label}
+              </Text>
             </TouchableOpacity>
           ))}
         </View>
+
+        {/* Custom days — only shown when cycle is "custom" */}
+        {cycle === "custom" && (
+          <>
+            <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>REPEAT EVERY (DAYS)</Text>
+            <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <View style={styles.fieldRow}>
+                <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Days</Text>
+                <TextInput
+                  value={customDays}
+                  onChangeText={setCustomDays}
+                  style={[styles.fieldInput, { color: colors.foreground }]}
+                  keyboardType="number-pad"
+                  placeholder="30"
+                  placeholderTextColor={colors.mutedForeground}
+                />
+              </View>
+            </View>
+          </>
+        )}
 
         {/* Category */}
         <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>CATEGORY</Text>
@@ -191,9 +256,14 @@ export default function SubscriptionDetailScreen() {
             <TouchableOpacity
               key={cat.id}
               onPress={() => setCategory(cat.id as CategoryId)}
-              style={[styles.chip, { backgroundColor: category === cat.id ? cat.color + "22" : colors.card, borderColor: category === cat.id ? cat.color : colors.border }]}
+              style={[styles.chip, {
+                backgroundColor: category === cat.id ? cat.color + "22" : colors.card,
+                borderColor: category === cat.id ? cat.color : colors.border,
+              }]}
             >
-              <Text style={[styles.chipText, { color: category === cat.id ? cat.color : colors.mutedForeground }]}>{cat.label}</Text>
+              <Text style={[styles.chipText, { color: category === cat.id ? cat.color : colors.mutedForeground }]}>
+                {cat.label}
+              </Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -205,18 +275,38 @@ export default function SubscriptionDetailScreen() {
             <TouchableOpacity
               key={m.value}
               onPress={() => setPayment(m.value)}
-              style={[styles.chip, { backgroundColor: payment === m.value ? colors.primary : colors.card, borderColor: payment === m.value ? colors.primary : colors.border }]}
+              style={[styles.chip, {
+                backgroundColor: payment === m.value ? colors.primary : colors.card,
+                borderColor: payment === m.value ? colors.primary : colors.border,
+              }]}
             >
-              <Text style={[styles.chipText, { color: payment === m.value ? "#FFF" : colors.foreground }]}>{m.label}</Text>
+              <Text style={[styles.chipText, { color: payment === m.value ? "#FFF" : colors.foreground }]}>
+                {m.label}
+              </Text>
             </TouchableOpacity>
           ))}
         </ScrollView>
 
+        {/* Renewal info */}
+        <View style={[styles.renewalCard, { backgroundColor: "#0F1E40" }]}>
+          <Ionicons name="calendar-outline" size={16} color="#4B9EFF" />
+          <Text style={styles.renewalText}>
+            Next renewal: {formatFullDate(nextRenewal)} · {formatCurrency(monthly, currency)}/mo
+          </Text>
+        </View>
+
         {/* Notes */}
-        <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border, marginTop: 8 }]}>
+        <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <View style={styles.fieldRow}>
             <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Notes</Text>
-            <TextInput value={notes} onChangeText={setNotes} style={[styles.fieldInput, { color: colors.foreground }]} multiline placeholder="Optional..." placeholderTextColor={colors.mutedForeground} />
+            <TextInput
+              value={notes}
+              onChangeText={setNotes}
+              style={[styles.fieldInput, { color: colors.foreground }]}
+              multiline
+              placeholder="Optional..."
+              placeholderTextColor={colors.mutedForeground}
+            />
           </View>
         </View>
 
@@ -258,6 +348,11 @@ const styles = StyleSheet.create({
   chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   chip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 100, borderWidth: 1 },
   chipText: { fontSize: 13, fontFamily: "Inter_500Medium" },
+  renewalCard: {
+    flexDirection: "row", alignItems: "center", gap: 8,
+    borderRadius: 12, padding: 14,
+  },
+  renewalText: { fontSize: 13, fontFamily: "Inter_500Medium", color: "rgba(255,255,255,0.8)", flex: 1 },
   deleteBtn: {
     flexDirection: "row", alignItems: "center", justifyContent: "center",
     gap: 8, paddingVertical: 14, borderRadius: 14, borderWidth: 1, marginTop: 8,

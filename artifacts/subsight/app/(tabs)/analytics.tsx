@@ -62,21 +62,19 @@ export default function AnalyticsScreen() {
     .map(([cat, val]) => ({ cat, val, pct: monthly > 0 ? (val / monthly) * 100 : 0 }))
     .sort((a, b) => b.val - a.val);
 
-  const totalStacked = catEntries.reduce((s, e) => s + e.val, 0);
+  // Fix: use spread to avoid mutating the `active` array
+  const sortedBySpend = useMemo(
+    () =>
+      [...active].sort(
+        (a, b) =>
+          getMonthlyEquivalent(b.cost, b.billing_cycle, b.custom_cycle_days) -
+          getMonthlyEquivalent(a.cost, a.billing_cycle, a.custom_cycle_days)
+      ),
+    [active]
+  );
 
-  const biggest = active.sort(
-    (a, b) =>
-      getMonthlyEquivalent(b.cost, b.billing_cycle, b.custom_cycle_days) -
-      getMonthlyEquivalent(a.cost, a.billing_cycle, a.custom_cycle_days)
-  )[0];
-
-  const rankedSubs = [...active]
-    .sort(
-      (a, b) =>
-        getMonthlyEquivalent(b.cost, b.billing_cycle, b.custom_cycle_days) -
-        getMonthlyEquivalent(a.cost, a.billing_cycle, a.custom_cycle_days)
-    )
-    .slice(0, 5);
+  const biggest = sortedBySpend[0];
+  const rankedSubs = sortedBySpend.slice(0, 5);
 
   const payEntries = Object.entries(byPayment)
     .map(([method, val]) => ({ method, val }))
@@ -86,6 +84,8 @@ export default function AnalyticsScreen() {
   active.forEach((s) => {
     countByPayment[s.payment_method] = (countByPayment[s.payment_method] || 0) + 1;
   });
+
+  const pausedCount = subscriptions.filter((s) => !s.is_active).length;
 
   return (
     <ScrollView
@@ -219,16 +219,11 @@ export default function AnalyticsScreen() {
           <View style={[styles.tipCard, { backgroundColor: "#F5A62322", borderColor: "#F5A62340" }]}>
             <View style={styles.tipHeader}>
               <Ionicons name="bulb" size={16} color="#F5A623" />
-              <Text style={[styles.tipLabel, { color: "#F5A623" }]}>COST-SAVING TIPS</Text>
+              <Text style={[styles.tipLabel, { color: "#F5A623" }]}>COST-SAVING TIP</Text>
             </View>
-            <View style={styles.tipItem}>
-              <View style={[styles.tipNum, { backgroundColor: "#F5A62340" }]}>
-                <Text style={styles.tipNumText}>1</Text>
-              </View>
-              <Text style={[styles.tipText, { color: colors.foreground }]}>
-                Review yearly plans — switching monthly subscriptions to yearly can save up to 20% annually.
-              </Text>
-            </View>
+            <Text style={[styles.tipText, { color: colors.foreground }]}>
+              Switching monthly subscriptions to yearly plans can save up to 20% annually. Review your {active.length} active services to see which ones offer a yearly discount.
+            </Text>
           </View>
 
           {/* Subscription Status */}
@@ -238,7 +233,10 @@ export default function AnalyticsScreen() {
               <View style={[styles.statusDot, { backgroundColor: "#2EC4A7" }]} />
               <Text style={[styles.statusLabel, { color: colors.foreground }]}>Active</Text>
               <View style={[styles.statusBar, { backgroundColor: colors.border }]}>
-                <View style={[styles.statusBarFill, { width: `${subscriptions.length > 0 ? (active.length / subscriptions.length) * 100 : 0}%`, backgroundColor: "#2EC4A7" }]} />
+                <View style={[styles.statusBarFill, {
+                  width: `${subscriptions.length > 0 ? (active.length / subscriptions.length) * 100 : 0}%`,
+                  backgroundColor: "#2EC4A7",
+                }]} />
               </View>
               <Text style={[styles.statusCount, { color: "#2EC4A7" }]}>{active.length}</Text>
               <Text style={[styles.statusAmt, { color: colors.foreground }]}>{formatCurrency(monthly, currency)}/mo</Text>
@@ -247,12 +245,15 @@ export default function AnalyticsScreen() {
               <View style={[styles.statusDot, { backgroundColor: colors.mutedForeground }]} />
               <Text style={[styles.statusLabel, { color: colors.foreground }]}>Paused</Text>
               <View style={[styles.statusBar, { backgroundColor: colors.border }]}>
-                <View style={[styles.statusBarFill, { width: "0%", backgroundColor: colors.mutedForeground }]} />
+                <View style={[styles.statusBarFill, {
+                  width: `${subscriptions.length > 0 ? (pausedCount / subscriptions.length) * 100 : 0}%`,
+                  backgroundColor: colors.mutedForeground,
+                }]} />
               </View>
-              <Text style={[styles.statusCount, { color: colors.mutedForeground }]}>
-                {subscriptions.filter((s) => !s.is_active).length}
+              <Text style={[styles.statusCount, { color: colors.mutedForeground }]}>{pausedCount}</Text>
+              <Text style={[styles.statusAmt, { color: colors.mutedForeground }]}>
+                {pausedCount > 0 ? "Paused" : "—"}
               </Text>
-              <Text style={[styles.statusAmt, { color: colors.mutedForeground }]}>—</Text>
             </View>
           </View>
         </>
@@ -297,13 +298,10 @@ const styles = StyleSheet.create({
   payName: { flex: 1, fontSize: 15, fontFamily: "Inter_500Medium" },
   payCount: { fontSize: 12, fontFamily: "Inter_400Regular" },
   payAmt: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
-  tipCard: { borderRadius: 14, borderWidth: 1, padding: 16, gap: 12 },
+  tipCard: { borderRadius: 14, borderWidth: 1, padding: 16, gap: 10 },
   tipHeader: { flexDirection: "row", alignItems: "center", gap: 6 },
   tipLabel: { fontSize: 11, fontFamily: "Inter_600SemiBold", letterSpacing: 1 },
-  tipItem: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
-  tipNum: { width: 24, height: 24, borderRadius: 12, alignItems: "center", justifyContent: "center" },
-  tipNumText: { fontSize: 12, fontFamily: "Inter_700Bold", color: "#F5A623" },
-  tipText: { flex: 1, fontSize: 14, fontFamily: "Inter_400Regular", lineHeight: 20 },
+  tipText: { fontSize: 14, fontFamily: "Inter_400Regular", lineHeight: 21 },
   statusRow: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 14, gap: 10 },
   statusDot: { width: 10, height: 10, borderRadius: 5 },
   statusLabel: { width: 50, fontSize: 14, fontFamily: "Inter_500Medium" },
