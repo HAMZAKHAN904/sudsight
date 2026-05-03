@@ -24,12 +24,12 @@ function MetricCard({
 }) {
   const colors = useColors();
   return (
-    <View style={[metricStyles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+      <View style={[metricStyles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
       <View style={[metricStyles.icon, { backgroundColor: iconBg }]}>
         <Ionicons name={icon} size={18} color="#FFF" />
       </View>
       <Text style={[metricStyles.label, { color: colors.mutedForeground }]}>{label}</Text>
-      <Text style={[metricStyles.value, { color: iconBg.replace("33", "") }]}>{value}</Text>
+      <Text style={[metricStyles.value, { color: iconBg }]}>{value}</Text>
       <Text style={[metricStyles.sub, { color: colors.mutedForeground }]}>{sub}</Text>
     </View>
   );
