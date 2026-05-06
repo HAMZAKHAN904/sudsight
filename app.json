@@ -2,11 +2,6 @@
   "expo": {
     "android": {
       "package": "com.hamzapowerplayer.subsight"
-    },
-    "extra": {
-      "eas": {
-        "projectId": "fdcabc8d-b883-42a9-8cc3-865fe0880de6"
-      }
     }
   }
 }
