@@ -16,7 +16,8 @@
       "env": {
         "PNPM_VERSION": "9.15.4",
         "EXPO_USE_FROZEN_LOCKFILE": "0",
-        "NPM_CONFIG_FROZEN_LOCKFILE": "false"
+        "NPM_CONFIG_FROZEN_LOCKFILE": "false",
+        "EXPO_ROUTER_APP_ROOT": "app"
       }
     },
     "production": {
@@ -27,7 +28,8 @@
       "env": {
         "PNPM_VERSION": "9.15.4",
         "EXPO_USE_FROZEN_LOCKFILE": "0",
-        "NPM_CONFIG_FROZEN_LOCKFILE": "false"
+        "NPM_CONFIG_FROZEN_LOCKFILE": "false",
+        "EXPO_ROUTER_APP_ROOT": "app"
       }
     }
   },
