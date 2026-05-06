@@ -9,7 +9,3 @@ node_modules
 **/web-build
 **/*.apk
 **/*.aab
-artifacts/mockup-sandbox
-artifacts/api-server
-lib/integrations
-scripts
