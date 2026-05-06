@@ -14,7 +14,7 @@
         "buildType": "apk"
       },
       "env": {
-        "PNPM_VERSION": "10.26.1",
+        "PNPM_VERSION": "9.15.4",
         "EXPO_USE_FROZEN_LOCKFILE": "0",
         "NPM_CONFIG_FROZEN_LOCKFILE": "false"
       }
@@ -25,7 +25,7 @@
         "buildType": "apk"
       },
       "env": {
-        "PNPM_VERSION": "10.26.1",
+        "PNPM_VERSION": "9.15.4",
         "EXPO_USE_FROZEN_LOCKFILE": "0",
         "NPM_CONFIG_FROZEN_LOCKFILE": "false"
       }
