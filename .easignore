@@ -1,0 +1,15 @@
+node_modules
+**/node_modules
+.git
+.expo
+.local
+.agents
+**/dist
+**/build
+**/web-build
+**/*.apk
+**/*.aab
+artifacts/mockup-sandbox
+artifacts/api-server
+lib/integrations
+scripts
