@@ -1,5 +1,6 @@
 {
   "name": "@workspace/subsight",
+  "packageManager": "pnpm@9.15.9",
   "version": "0.0.0",
   "private": true,
   "main": "expo-router/entry",
