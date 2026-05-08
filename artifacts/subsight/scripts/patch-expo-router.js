@@ -6,7 +6,8 @@ const filesToPatch = [
   'node_modules/expo-router/_ctx.ios.js',
   'node_modules/expo-router/_ctx.js',
   'node_modules/expo-router/_ctx.web.js',
-  'node_modules/expo-router/_ctx-shared.js'
+  'node_modules/expo-router/_ctx-shared.js',
+  'node_modules/expo-router/_ctx-html.js'
 ];
 
 filesToPatch.forEach(file => {
