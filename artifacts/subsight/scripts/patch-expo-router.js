@@ -16,9 +16,24 @@ filesToPatch.forEach(file => {
   [localPath, rootPath].forEach(filePath => {
     if (fs.existsSync(filePath)) {
       let content = fs.readFileSync(filePath, 'utf8');
+      let patched = false;
       if (content.includes('process.env.EXPO_ROUTER_APP_ROOT')) {
-        content = content.replace(/process\.env\.EXPO_ROUTER_APP_ROOT/g, '"app"');
+        content = content.replace(/process\.env\.EXPO_ROUTER_APP_ROOT/g, '"../../app"');
+        patched = true;
+      } else if (content.includes('"./app"')) {
+        content = content.replace(/"\.\/app"/g, '"../../app"');
+        patched = true;
+      } else if (content.includes('"app"')) {
+        content = content.replace(/"app"/g, '"../../app"');
+        patched = true;
+      }
+      
+      if (content.includes('process.env.EXPO_ROUTER_IMPORT_MODE')) {
         content = content.replace(/process\.env\.EXPO_ROUTER_IMPORT_MODE/g, '"sync"');
+        patched = true;
+      }
+
+      if (patched) {
         fs.writeFileSync(filePath, content);
         console.log(`Patched ${filePath}`);
       }

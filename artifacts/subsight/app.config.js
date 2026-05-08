@@ -1,4 +1,4 @@
-process.env.EXPO_ROUTER_APP_ROOT = "app";
+process.env.EXPO_ROUTER_APP_ROOT = "./app";
 
 module.exports = {
   expo: {
@@ -29,7 +29,7 @@ module.exports = {
         "expo-router",
         {
           origin: "https://replit.com/",
-          root: "app",
+          root: "./app",
         },
       ],
       "expo-font",
